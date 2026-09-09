@@ -1,53 +1,63 @@
 ---
-title: LLM Providers
-description: Supported LLM providers and configuration for Kure Monitor's AI-powered troubleshooting.
+title: LLM Providers & Multi-Model Support
+description: Configure multiple AI providers, automatic failover chains, and model selection in Kure Monitor.
 ---
 
-Kure Monitor uses an LLM to generate contextual fixes for pod failures and security findings. The provider is configured **after install** from the **Admin Panel → AI Configuration** — no API keys at install time.
+Kure Monitor uses large language models to generate root-cause explanations and remediations for pod failures, AI advice detections, and security misconfigurations.
+
+Administrators can register **multiple LLM profiles** simultaneously, set a primary default with automatic failover, and allow on-call engineers to pick a specific model during live troubleshooting.
+
+All configurations are handled **after installation** directly in the web UI under **Admin Panel → AI Configuration** — no API keys required in Helm values at deploy time.
+
+---
 
 ## Supported Providers
 
-Kure Monitor **supports almost any LLM provider**! 
+Whether you run an air-gapped on-premise cluster or connect to external cloud models, Kure Monitor supports the following providers:
 
-Whether you are using a managed cloud service or running an air-gapped local model, Kure has you covered:
+- **Cluster Local AI (Auto-Detect)**: Automatically scans your Kubernetes namespaces for local inference engines (such as Ollama, vLLM, LocalAI, TGI, or NVIDIA NIM). Kure extracts the internal service endpoint and enumerates loaded models without manual URL entry.
+- **GitHub Copilot / Models**: Quick-select integration for GitHub Copilot and GitHub Models endpoints (including `openai/gpt-5.5-mini`, `azureml/DeepSeek-R1`, etc.).
+- **Anthropic**: Direct support for Claude models (`claude-3-5-sonnet`, `claude-3-7-sonnet`, etc.).
+- **Google Gemini**: Quick-select option for Gemini Pro and Flash models.
+- **Custom Provider**: Any OpenAI-compatible endpoint (OpenAI, Groq, Mistral, Together AI, DeepSeek, or private gateways).
 
-- **Local AI Auto-Detect**: Kure automatically scans your Kubernetes cluster's services for local LLMs (like Ollama, vLLM, LocalAI, TGI, or NVIDIA NIM). With a single click in the Admin panel, it automatically retrieves the service URL and lists the available models you have loaded.
-- **Predefined Providers**: For convenience, we offer quick-select options for **Anthropic**, **Google Gemini**, and **GitHub Copilot**.
-- **Custom Provider**: For everything else (OpenAI, Groq, DeepSeek, or any other API), use the **Custom** option.
+---
 
-### The "Custom" Provider
+## Multi-LLM Profiles & Automatic Failover
 
-The Custom provider allows you to connect to absolutely any OpenAI-compatible API. 
+You are not restricted to a single provider. In the Admin Panel, you can add and maintain a pool of configurations:
 
-When you select Custom, you need to provide:
-1. **Base URL**: The API endpoint (e.g., `https://api.openai.com/v1`, `https://api.groq.com/openai/v1`)
-2. **API Key**: Your secret token.
-3. **Model Name**: Type in the exact name of the model you want to use (e.g., `gpt-5.5-mini`, `llama-3.3-70b-versatile`, `qwen2.5:72b`).
+1. **Multiple Concurrent Profiles**: Register different models with human-readable aliases (for example, `"In-Cluster Ollama (qwen2.5)"`, `"GitHub Copilot"`, `"Anthropic Production"`).
+2. **Designated Default**: Mark any registered profile as the cluster default. All automated background scans and initial pod failure analyses use this model.
+3. **Automatic Failover**: If the primary LLM fails (due to provider timeouts, network partitions, context-window limits, or rate quotas), Kure automatically tries the next registered profile in your pool before falling back to rule-based diagnostics.
+4. **On-Demand Selection in Pod Details**: While inspecting a pod failure, engineers can switch providers using the dropdown in the triage view to regenerate advice with a different model.
 
-## Configuring a provider
+---
 
-1. Open the dashboard.
-2. Go to **Admin Panel → AI Configuration**.
-3. Select either a **Predefined Provider** (like Anthropic), **Auto-Detect** (for cluster models), or **Custom**.
-4. Fill in your Base URL, API Key, and Model name (or select them from the auto-detected dropdown).
-5. Click **Test Connection** — this verifies that your key and URL work.
-6. Click **Save Configuration**.
+## Adding a Provider Profile
 
-If the LLM call ever fails at runtime (e.g., due to rate limits), Kure falls back to rule-based solutions so the dashboard always stays useful.
+1. Open the dashboard and log in as an administrator.
+2. Navigate to **Admin Panel → AI Configuration**.
+3. Choose a provider type:
+   - Click **Scan Cluster for Local LLMs** to detect in-cluster Ollama/vLLM instances, or
+   - Select **GitHub Copilot**, **Anthropic**, **Google Gemini**, or **Custom**.
+4. Enter the **Model Name** and **API Key** (if required).
+5. Click **Test Connection** to verify endpoint reachability and credentials. Kure immediately registers the verified profile.
+6. Toggle the **Default** button if you wish this profile to handle primary cluster triage.
 
-## Rotating an API key
+---
 
-1. Generate a new key with your provider.
-2. Go to **Admin Panel → AI Configuration**.
-3. Replace the existing key.
-4. Click **Test Connection** → **Save**.
+## Security & Credential Encryption
 
-LLM API keys are encrypted at rest using a Fernet key (`security.encryptionKey` in Helm values). If left empty at install time, the chart auto-generates one.
+All provider API tokens are encrypted at rest using AES-256 (Fernet symmetric encryption). 
 
-## Removing a provider
+- The encryption key is managed by Kubernetes Secret `kure-encryption-key` (`security.encryptionKey` in Helm values).
+- If omitted during installation, Helm automatically generates a secure key on first install and preserves it across future Helm upgrades.
+- API keys are never exposed in plaintext to the browser; only masked identifiers are displayed in the Admin UI.
 
-```http
-DELETE /api/admin/llm/config
-```
+---
 
-…or click **Delete** in the Admin panel. Kure will revert to rule-based solutions.
+## Removing or Updating Profiles
+
+- To update credentials or switch models, open the profile card in **AI Configuration**, modify the fields, test, and save.
+- To remove an LLM profile, click **Delete** on its card. If all providers are removed, Kure seamlessly switches to deterministic rule-based analysis.

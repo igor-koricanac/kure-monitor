@@ -5,6 +5,16 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-09-09
+
+Headline changes:
+- **Multi-LLM Provider Profiles**: Register multiple AI providers simultaneously (Ollama, OpenAI, Anthropic, Gemini, GitHub Copilot, custom endpoints). Set a default with automatic failover — if the primary provider fails, Kure tries the next active provider before falling back to rule-based analysis. Engineers can also pick a specific model per-triage from a dropdown in Pod Details.
+- **Custom LLM Instructions**: Cluster admins can write a Markdown instruction document (up to 10KB) that gets prepended to every AI prompt. Write directly in the Admin Panel, or import/export `.md` files. Use it to document service mesh conventions, require Helm values.yaml diffs instead of raw kubectl, or point the model at internal runbooks.
+- **GitHub Copilot / Models Provider**: Added `copilot` as a first-class provider type for GitHub Models inference.
+- **Encryption Key Preservation**: The Helm chart now uses `lookup` to preserve the existing Fernet encryption key Secret across `helm upgrade`, preventing `InvalidToken` errors that previously invalidated all stored API tokens on every upgrade.
+- **Website Redesign**: Complete landing page rebuild, contact page, three new guides (Air-Gapped Ollama, Cascading Failures Playbook, K8s AI Debugging), new comparison pages, legal pages, and updated interactive demo components.
+- **Dashboard UI Refresh**: Consistent dark mode across all components, multi-LLM management panel, per-finding model attribution in AI Advice, and model selector dropdown in TroubleshootSection.
+
 ## [2.4.5] - 2026-08-04
 
 Headline changes:

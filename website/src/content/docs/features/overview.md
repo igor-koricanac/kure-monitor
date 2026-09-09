@@ -12,6 +12,8 @@ All four features can be individually enabled or disabled at install time via th
 | [Pod Monitoring](/features/pod-monitoring/) | Real-time failure detection (CrashLoopBackOff, ImagePullBackOff, OOMKilled, Pending, FailedScheduling, FailedMount) with AI-generated solutions and live logs |
 | [Security Scanner](/features/security-scanner/) | 50+ misconfiguration checks with AI remediation, trusted-registry suppressions, and CSV/JSON/PDF export |
 | [Topology Diagram](/features/diagram/) | Interactive Kubernetes graph (per-namespace and per-workload), click nodes for manifests, click edges to focus paths |
+| [AI Advice](/features/advice/) | Proactive cluster hygiene scanner with 38+ detectors and lazy on-demand AI explanations |
+| [Custom Instructions](/features/custom-instructions/) | Prepend custom Markdown instructions (`.md`) to every AI diagnosis and root-cause analysis prompt |
 | [Mirror Pod Testing](/features/mirror-pod/) | Deploy a temporary copy of a failing pod with the AI fix applied — verify before committing to git |
 | [Notifications](/features/notifications/) | Slack and Microsoft Teams webhooks for new failures and critical findings |
 

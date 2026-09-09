@@ -23,12 +23,12 @@ spec:
     agent:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/agent
-        tag: "2.4.5"
+        tag: "2.5.0"
         pullPolicy: IfNotPresent
     securityScanner:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/security-scanner
-        tag: "2.4.5"
+        tag: "2.5.0"
         pullPolicy: IfNotPresent
     postgresql:
       persistence:

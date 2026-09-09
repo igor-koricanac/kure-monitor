@@ -232,7 +232,7 @@
                 <div class="section-icon">📦</div>
                 Add Repository
             </h2>
-            <pre><code>helm repo add kure https://kuremonitor.com/
+            <pre><code>helm repo add kure-monitor https://kuremonitor.com/
 helm repo update</code></pre>
             
             <h2>
@@ -240,7 +240,7 @@ helm repo update</code></pre>
                 Install Chart
             </h2>
             <pre><code># Install with a generated DB password
-helm install kure-monitor kure-monitor/kure --version 2.4.5 \
+helm install kure-monitor kure-monitor/kure --version 2.5.0 \
     --create-namespace --namespace kure-system \
     --set postgresql.password="$(openssl rand -hex 24)"
 

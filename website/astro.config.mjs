@@ -153,6 +153,7 @@ export default defineConfig({
                   { label: 'Security Scanner', slug: 'features/security-scanner' },
                   { label: 'Topology Diagram', slug: 'features/diagram' },
                   { label: 'AI Advice', slug: 'features/advice' },
+                  { label: 'Custom Instructions', slug: 'features/custom-instructions' },
                   { label: 'Mirror Pod Testing', slug: 'features/mirror-pod' },
                   { label: 'Notifications', slug: 'features/notifications' },
                   { label: 'Suppressions', slug: 'features/suppressions' },

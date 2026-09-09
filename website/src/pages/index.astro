@@ -42,7 +42,7 @@ import '../tailwind.css';
         "headline": "Open-Source Kubernetes AI Troubleshooting & Observability",
         "operatingSystem": "Kubernetes, Linux",
         "applicationCategory": "DeveloperApplication",
-        "softwareVersion": "2.4.5",
+        "softwareVersion": "2.5.0",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -159,9 +159,9 @@ import '../tailwind.css';
           <p class="text-lg text-slate-600 max-w-2xl mx-auto">Kure replaces fragmented monitoring tools with a unified, AI-native platform.</p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-8">
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           <!-- Feature 1 -->
-          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
             <div class="h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
               <img 
                 src="/images/ai-advice.gif" 
@@ -173,7 +173,7 @@ import '../tailwind.css';
                 class="w-full h-full object-cover rounded shadow-sm border border-slate-200" 
               />
             </div>
-            <div class="p-6">
+            <div class="p-6 flex-1 flex flex-col">
               <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
                 <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
               </div>
@@ -183,7 +183,7 @@ import '../tailwind.css';
           </div>
 
           <!-- Feature 2 -->
-          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
             <div class="h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
               <img 
                 src="/images/security_scan_list.png" 
@@ -195,7 +195,7 @@ import '../tailwind.css';
                 class="w-full h-full object-cover object-top rounded shadow-sm border border-slate-200" 
               />
             </div>
-            <div class="p-6">
+            <div class="p-6 flex-1 flex flex-col">
               <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
                 <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               </div>
@@ -205,7 +205,7 @@ import '../tailwind.css';
           </div>
 
           <!-- Feature 3 -->
-          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
             <div class="h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
               <img 
                 src="/images/pod_list.png" 
@@ -217,12 +217,66 @@ import '../tailwind.css';
                 class="w-full h-full object-cover object-left-top rounded shadow-sm border border-slate-200" 
               />
             </div>
-            <div class="p-6">
+            <div class="p-6 flex-1 flex flex-col">
               <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
                 <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
               </div>
               <h3 class="text-xl font-bold text-slate-900 mb-2">Real-Time Detection</h3>
               <p class="text-slate-600">Catch CrashLoopBackOff, OOMKilled, and Pending pods the moment they happen with Slack/Teams alerts.</p>
+            </div>
+          </div>
+
+          <!-- Feature 4: Multi-LLM Support -->
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
+            <div class="h-48 bg-slate-900 p-5 flex flex-col justify-center font-mono text-xs text-slate-300 border-b border-slate-200">
+              <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400">
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Provider Pool</span>
+                <span class="text-[11px] text-slate-500">Auto-Failover</span>
+              </div>
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/80 border border-slate-700 text-white">
+                  <span class="font-medium text-emerald-300">Cluster Ollama (qwen2.5)</span>
+                  <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700">Default</span>
+                </div>
+                <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/40 text-slate-400">
+                  <span>GitHub Copilot (gpt-5.5-mini)</span>
+                  <span class="text-[10px] text-slate-500">Standby</span>
+                </div>
+                <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/40 text-slate-400">
+                  <span>Anthropic (claude-3-5-sonnet)</span>
+                  <span class="text-[10px] text-slate-500">Standby</span>
+                </div>
+              </div>
+            </div>
+            <div class="p-6 flex-1 flex flex-col">
+              <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 mb-2">Multi-LLM Profiles</h3>
+              <p class="text-slate-600">Register multiple AI providers side by side (Ollama, OpenAI, Claude, Gemini, Copilot). Set a primary default with automatic failover, or pick a specific model directly in pod triage.</p>
+            </div>
+          </div>
+
+          <!-- Feature 5: Custom Instructions -->
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col md:col-span-2 lg:col-span-1">
+            <div class="h-48 bg-slate-900 p-5 flex flex-col justify-center font-mono text-xs text-slate-300 border-b border-slate-200">
+              <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400">
+                <span class="text-slate-300 font-semibold">instructions.md</span>
+                <span class="text-[11px] text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Active</span>
+              </div>
+              <div class="bg-slate-950 p-2.5 rounded border border-slate-800 text-slate-300 text-[11px] leading-relaxed line-clamp-4">
+                <p class="text-slate-400"># Production Guidelines</p>
+                <p>- We use Istio sidecars; verify istio-init first.</p>
+                <p>- Always suggest values.yaml changes over raw kubectl.</p>
+                <p>- Target Helm release "apps-prod".</p>
+              </div>
+            </div>
+            <div class="p-6 flex-1 flex flex-col">
+              <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 mb-2">Custom Instructions (.md)</h3>
+              <p class="text-slate-600">Teach AI models your cluster topology, service mesh quirks, and team standards. Write, import, and export instructions directly in Markdown without altering code or manifests.</p>
             </div>
           </div>
         </div>

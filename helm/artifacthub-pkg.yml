@@ -1,5 +1,4 @@
-# Artifact Hub package metadata file
-version: 2.4.5
+version: 2.5.0
 name: kure
 category: monitoring-logging
 displayName: Kure - Kubernetes Failure Diagnosis
@@ -8,16 +7,16 @@ description: |
   Kubernetes AI observability platform. Instantly detect and debug pod failures (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), proactively scan your entire cluster with the AI Advice engine, visualize workloads with an interactive topology Diagram, and audit your configurations with a built-in Security Scanner.
 license: Apache-2.0
 homeURL: https://kuremonitor.com
-appVersion: "2.4.5"
+appVersion: "2.5.0"
 containersImages:
-  - name: kure-monitor-agent
-    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.4.5
-  - name: kure-monitor-backend
-    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.4.5
-  - name: kure-monitor-frontend
-    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.4.5
-  - name: kure-monitor-security-scanner
-    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.4.5
+  - name: agent
+    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.5.0
+  - name: backend
+    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.5.0
+  - name: frontend
+    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.5.0
+  - name: security-scanner
+    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.5.0
 operator: false
 deprecated: false
 prerelease: false
@@ -43,24 +42,21 @@ provider:
   name: igor-koricanac
 changes:
   - kind: added
-    description: "Local AI Auto-Discovery: Automatically scans Kubernetes services for local LLMs (Ollama, vLLM, LocalAI, NIM) and retrieves available models."
+    description: "Multi-LLM Provider Profiles: Register multiple AI providers simultaneously with automatic failover across the pool."
+  - kind: added
+    description: "Custom LLM Instructions: Write Markdown instruction documents prepended to every AI prompt for domain-specific guidance."
+  - kind: added
+    description: "GitHub Copilot / Models: Added copilot as a first-class provider type for GitHub Models inference."
   - kind: changed
-    description: "Flexible Custom Provider: Replaced rigid AI dropdowns with a unified Custom provider supporting any OpenAI-compatible API and free-text model entry."
+    description: "Encryption Key Preservation: Helm chart uses lookup to preserve encryption Secret across upgrades, preventing InvalidToken errors."
   - kind: changed
-    description: "UI & Branding: Official logo integrated into dashboard, login screens, and docs; enforced mandatory light theme."
-  - kind: changed
-    description: "Infrastructure: NodeJS 24 test environment, updated helmrelease pipelines, repository migration, and completely removed restrictive network policies to simplify cluster integration."
+    description: "Dashboard UI Refresh: Consistent dark mode, multi-LLM management panel, per-finding model attribution, model selector in TroubleshootSection."
 install: |
-  ```bash
   helm repo add kure-monitor https://kuremonitor.com/
-  helm repo update
 
-  # Install Kure Monitor
-  helm install kure-monitor kure-monitor/kure --version 2.4.5 \
+  helm install kure-monitor kure-monitor/kure --version 2.5.0 \
     --create-namespace --namespace kure-system \
     --set postgresql.password="$(openssl rand -hex 24)"
 
   # On first visit, the dashboard prompts you to create the initial admin account.
-  # After installation, configure LLM provider via the Admin panel
-  # to enable AI-powered troubleshooting suggestions.
   ```
