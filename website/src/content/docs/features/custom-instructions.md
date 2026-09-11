@@ -20,6 +20,8 @@ Out of the box, LLMs generate generic Kubernetes advice based on public error pa
 
 ## Configuring Custom Instructions
 
+![Custom Instructions in Action](/images/custom-instructions-demo.gif)
+
 1. Navigate to **Admin Panel → AI Configuration**.
 2. Scroll to the **Custom Instructions** editor.
 3. Type or paste your guidelines in standard Markdown (`.md`).

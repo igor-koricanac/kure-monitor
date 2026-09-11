@@ -41,6 +41,27 @@ For `CrashLoopBackOff` and `OOMKilled`, Kure also runs a log-aware pass that pul
   description="Pick a provider, set a key, done. Groq is the default."
 />
 
+## Multi-LLM & custom instructions
+
+Register multiple AI provider profiles simultaneously (Ollama, OpenAI, Anthropic, Gemini, GitHub Copilot) with automatic failover, and guide model behavior with custom Markdown instruction files.
+
+![Multi-LLM Profiles and Custom Instructions](/showcase/multi-llm-and-custom-instructions-support.png)
+
+Cluster administrators can write, import, and export instructions directly in the dashboard to steer how the AI diagnoses pod failures and suggests fixes.
+
+![Custom Instructions in Action](/showcase/custom-instructions-demo.gif)
+
+<LinkCard
+  title="Multi-LLM Support →"
+  href="/features/multi-llm/"
+  description="Set up multiple provider profiles, configure automatic failover, and switch models per pod."
+/>
+<LinkCard
+  title="Custom Instructions →"
+  href="/features/custom-instructions/"
+  description="Inject team standards, service mesh quirks, and Helm conventions into AI prompts."
+/>
+
 ## AI Advice
 
 The proactive counterpart to failure diagnosis. Trigger a scan over running, healthy workloads — and cluster flows — and Kure surfaces architectural mismatches a passing readiness probe will never tell you, each with rule-based evidence and a plain-language explanation of what to improve.

@@ -25,6 +25,8 @@ Whether you run an air-gapped on-premise cluster or connect to external cloud mo
 
 ## Multi-LLM Profiles & Automatic Failover
 
+![Multi-LLM Profiles and Custom Instructions](/images/multi-llm-and-custom-instructions-support.png)
+
 You are not restricted to a single provider. In the Admin Panel, you can add and maintain a pool of configurations:
 
 1. **Multiple Concurrent Profiles**: Register different models with human-readable aliases (for example, `"In-Cluster Ollama (qwen2.5)"`, `"GitHub Copilot"`, `"Anthropic Production"`).

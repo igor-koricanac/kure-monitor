@@ -10,6 +10,7 @@ All four features can be individually enabled or disabled at install time via th
 | Feature | What it does |
 |---------|--------------|
 | [Pod Monitoring](/features/pod-monitoring/) | Real-time failure detection (CrashLoopBackOff, ImagePullBackOff, OOMKilled, Pending, FailedScheduling, FailedMount) with AI-generated solutions and live logs |
+| [Multi-LLM Support](/features/multi-llm/) | Multiple simultaneous AI provider profiles with designated default, automatic failover, and per-triage selection |
 | [Security Scanner](/features/security-scanner/) | 50+ misconfiguration checks with AI remediation, trusted-registry suppressions, and CSV/JSON/PDF export |
 | [Topology Diagram](/features/diagram/) | Interactive Kubernetes graph (per-namespace and per-workload), click nodes for manifests, click edges to focus paths |
 | [AI Advice](/features/advice/) | Proactive cluster hygiene scanner with 38+ detectors and lazy on-demand AI explanations |

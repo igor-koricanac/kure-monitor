@@ -150,6 +150,7 @@ export default defineConfig({
               items: [
                   { label: 'Overview', slug: 'features/overview' },
                   { label: 'Pod Monitoring', slug: 'features/pod-monitoring' },
+                  { label: 'Multi-LLM Support', slug: 'features/multi-llm' },
                   { label: 'Security Scanner', slug: 'features/security-scanner' },
                   { label: 'Topology Diagram', slug: 'features/diagram' },
                   { label: 'AI Advice', slug: 'features/advice' },
