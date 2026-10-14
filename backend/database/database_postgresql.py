@@ -16,6 +16,7 @@ from .mixins import (
     LoginAttemptsMixin,
     ChatMixin,
     ChatOpsMixin,
+    TeamMixin,
 )
 from services.prometheus_metrics import DATABASE_QUERIES_TOTAL
 
@@ -36,6 +37,7 @@ class PostgreSQLDatabase(
     LoginAttemptsMixin,
     ChatMixin,
     ChatOpsMixin,
+    TeamMixin,
     DatabaseInterface,
 ):
     def __init__(self):
@@ -601,6 +603,56 @@ class PostgreSQLDatabase(
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_chatops_pod_failure 
                     ON chatops_messages(pod_failure_id)
+                """)
+
+                # Create teams table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS teams (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(64) UNIQUE NOT NULL,
+                        description TEXT,
+                        access_level VARCHAR(16) NOT NULL DEFAULT 'read' CHECK (access_level IN ('read', 'write')),
+                        all_namespaces BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name)
+                """)
+
+                # Create team_members junction table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS team_members (
+                        team_id INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        PRIMARY KEY (team_id, user_id)
+                    )
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id)
+                """)
+
+                # Create team_namespaces junction table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS team_namespaces (
+                        team_id INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                        namespace VARCHAR(255) NOT NULL,
+                        PRIMARY KEY (team_id, namespace)
+                    )
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_team_namespaces_ns ON team_namespaces(namespace)
+                """)
+
+                # Create team_tabs junction table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS team_tabs (
+                        team_id INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                        tab VARCHAR(64) NOT NULL,
+                        PRIMARY KEY (team_id, tab)
+                    )
                 """)
 
             logger.info("PostgreSQL database initialized successfully")

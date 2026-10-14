@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 import difflib
 import logging
 import traceback
@@ -151,10 +151,17 @@ def create_security_router(deps: RouterDeps) -> APIRouter:
     websocket_manager = deps.websocket_manager
 
     @router.get("/security/findings", response_model=list[SecurityFindingResponse])
-    async def get_security_findings():
-        """Get all security findings from database"""
+    async def get_security_findings(request: Request):
+        """Get all security findings from database, filtered by user team namespaces if restricted."""
         try:
-            return await db.get_security_findings()
+            findings = await db.get_security_findings()
+            user = getattr(request.state, "user", None)
+            if user and user.get("role") != "admin":
+                perms = await db.get_user_effective_permissions(user)
+                if not perms.get("all_namespaces"):
+                    allowed_ns = set(perms.get("namespaces", []))
+                    findings = [f for f in findings if f.namespace in allowed_ns]
+            return findings
         except Exception as e:
             logger.error(f"Error getting security findings: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")

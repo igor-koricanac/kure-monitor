@@ -13,12 +13,12 @@ spec:
     backend:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/backend
-        tag: "bcf9e9"
+        tag: "b2a36be"
         pullPolicy: IfNotPresent
     frontend:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/frontend
-        tag: "888dc99"
+        tag: "b2a36be"
         pullPolicy: IfNotPresent
     agent:
       image:

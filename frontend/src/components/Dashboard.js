@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, Clock, EyeOff, RefreshCw, LogOut, Network, Lightbulb } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, Clock, EyeOff, RefreshCw, LogOut, Network, Lightbulb, Users } from 'lucide-react';
 import PodTable from './PodTable';
 import SecurityTable from './SecurityTable';
 import AdminPanel from './AdminPanel';
@@ -15,7 +15,13 @@ import logo from '../kure_monitor_logo.svg';
 const Dashboard = () => {
   const { user, userRole, logout } = useAuth();
   const navigate = useNavigate();
-  const canWrite = userRole === 'admin' || userRole === 'member';
+  const isAdmin = userRole === 'admin';
+  const canWrite = isAdmin || user?.effective_access_level === 'write';
+  const hasTeam = isAdmin || Boolean(user?.has_team);
+  const allowedTabs = useMemo(() => {
+    return user?.effective_tabs || (isAdmin ? ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice', 'admin'] : []);
+  }, [user?.effective_tabs, isAdmin]);
+
   const [activeTab, setActiveTab] = useState('monitoring');
   const [pods, setPods] = useState([]);
   const [securityFindings, setSecurityFindings] = useState([]);
@@ -473,12 +479,33 @@ const Dashboard = () => {
       }
     };
 
-    loadData();
+    if (hasTeam) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasTeam]);
+
+  // Adjust active tab if user's permissions don't allow the current tab
+  useEffect(() => {
+    if (!isAdmin && allowedTabs.length > 0) {
+      const tabMap = {
+        pod_monitoring: 'monitoring',
+        security_scanner: 'security',
+        diagram: 'diagram',
+        ai_advice: 'advice',
+      };
+      const allowedClientTabs = allowedTabs.map((t) => tabMap[t]).filter(Boolean);
+      if (allowedClientTabs.length > 0 && !allowedClientTabs.includes(activeTab)) {
+        setActiveTab(allowedClientTabs[0]);
+      }
+    }
+  }, [isAdmin, allowedTabs, activeTab]);
+
 
   // Trigger a full security rescan
   const handleSecurityRescan = useCallback(async () => {
@@ -616,12 +643,27 @@ const Dashboard = () => {
           <SetupBanner isDark={isDark} onNavigateToAdmin={() => setActiveTab('admin')} />
         )}
 
+        {/* Empty state for non-admin users without a team */}
+        {!hasTeam ? (
+          <div className={`p-12 text-center rounded-sm border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+              <Users className={`w-8 h-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              No Team Assigned
+            </h3>
+            <p className={`text-sm max-w-md mx-auto ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              You are not currently assigned to any team. Contact an admin to get access.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Tabs */}
         <div className="mb-6">
           <div className={`border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
             <nav className="-mb-px flex justify-between">
               <div className="flex">
-                {features.pod_monitoring && (
+                {features.pod_monitoring && (isAdmin || allowedTabs.includes('pod_monitoring')) && (
                 <button
                   onClick={() => setActiveTab('monitoring')}
                   className={`${
@@ -639,7 +681,7 @@ const Dashboard = () => {
                   )}
                 </button>
                 )}
-                {features.security_scan && (
+                {features.security_scan && (isAdmin || allowedTabs.includes('security_scanner')) && (
                 <button
                   onClick={() => setActiveTab('security')}
                   className={`${
@@ -657,7 +699,7 @@ const Dashboard = () => {
                   )}
                 </button>
                 )}
-                {features.ai_advice && (
+                {features.ai_advice && (isAdmin || allowedTabs.includes('ai_advice')) && (
                 <button
                   onClick={() => setActiveTab('advice')}
                   className={`${
@@ -670,7 +712,7 @@ const Dashboard = () => {
                   <span>Advice</span>
                 </button>
                 )}
-                {features.diagram && (
+                {features.diagram && (isAdmin || allowedTabs.includes('diagram')) && (
                 <button
                   onClick={() => setActiveTab('diagram')}
                   className={`${
@@ -1089,6 +1131,8 @@ const Dashboard = () => {
           )}
 
         </div>
+        </>
+        )}
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ involvement here.
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from models.models import DiagramResponse
 from services.topology_service import (
@@ -33,13 +33,21 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
     service = getattr(deps, "topology_service", None) or TopologyService()
 
     @router.get("/diagram/namespaces")
-    async def list_diagram_namespaces(kind: str | None = Query(None)):
+    async def list_diagram_namespaces(request: Request, kind: str | None = Query(None)):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
         try:
             namespaces = await service.list_namespaces(kind=kind)
+            user = getattr(request.state, "user", None)
+            if user and user.get("role") != "admin":
+                db = getattr(deps, "db", None)
+                if db:
+                    perms = await db.get_user_effective_permissions(user)
+                    if not perms.get("all_namespaces"):
+                        allowed_ns = set(perms.get("namespaces", []))
+                        namespaces = [ns for ns in namespaces if ns in allowed_ns]
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except RuntimeError as e:
@@ -50,11 +58,23 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
         return {"namespaces": namespaces}
 
     @router.get("/diagram/namespace/{ns}", response_model=DiagramResponse)
-    async def get_namespace_diagram(ns: str):
+    async def get_namespace_diagram(ns: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
+        user = getattr(request.state, "user", None)
+        if user and user.get("role") != "admin":
+            db = getattr(deps, "db", None)
+            if db:
+                perms = await db.get_user_effective_permissions(user)
+                if not perms.get("all_namespaces"):
+                    allowed_ns = set(perms.get("namespaces", []))
+                    if ns not in allowed_ns:
+                        raise HTTPException(
+                            status_code=403,
+                            detail=f"Access denied to namespace '{ns}'",
+                        )
         try:
             return await service.get_namespace_diagram(ns)
         except RuntimeError as e:

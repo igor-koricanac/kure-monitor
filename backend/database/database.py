@@ -385,3 +385,34 @@ class Database:
     async def get_chatops_message_by_message_id(self, provider: str, message_id: str):
         return await self._db.get_chatops_message_by_message_id(provider, message_id)
 
+    # Teams
+    async def list_teams(self):
+        return await self._db.list_teams()
+
+    async def get_team_by_id(self, team_id: int):
+        return await self._db.get_team_by_id(team_id)
+
+    async def get_team_by_name(self, name: str):
+        return await self._db.get_team_by_name(name)
+
+    async def create_team(self, name: str, description=None, access_level="read", all_namespaces=False, tabs=None, namespaces=None, member_ids=None):
+        return await self._db.create_team(name, description, access_level, all_namespaces, tabs, namespaces, member_ids)
+
+    async def update_team(self, team_id: int, name=None, description=None, access_level=None, all_namespaces=None, tabs=None, namespaces=None):
+        return await self._db.update_team(team_id, name, description, access_level, all_namespaces, tabs, namespaces)
+
+    async def delete_team(self, team_id: int):
+        return await self._db.delete_team(team_id)
+
+    async def add_team_member(self, team_id: int, user_id: int):
+        return await self._db.add_team_member(team_id, user_id)
+
+    async def remove_team_member(self, team_id: int, user_id: int):
+        return await self._db.remove_team_member(team_id, user_id)
+
+    async def get_user_teams(self, user_id: int):
+        return await self._db.get_user_teams(user_id)
+
+    async def get_user_effective_permissions(self, user: dict):
+        return await self._db.get_user_effective_permissions(user)
+

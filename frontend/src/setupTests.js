@@ -7,3 +7,9 @@ import '@testing-library/jest-dom';
 if (typeof globalThis.structuredClone !== 'function') {
   globalThis.structuredClone = (v) => JSON.parse(JSON.stringify(v));
 }
+
+if (typeof globalThis.TextEncoder === 'undefined') {
+  const { TextEncoder, TextDecoder } = require('util');
+  globalThis.TextEncoder = TextEncoder;
+  globalThis.TextDecoder = TextDecoder;
+}

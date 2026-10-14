@@ -10,6 +10,7 @@ from .users import UserMixin
 from .login_attempts import LoginAttemptsMixin
 from .chat import ChatMixin
 from .chatops import ChatOpsMixin
+from .teams import TeamMixin
 
 __all__ = [
     "PodFailureMixin",
@@ -24,4 +25,5 @@ __all__ = [
     "LoginAttemptsMixin",
     "ChatMixin",
     "ChatOpsMixin",
+    "TeamMixin",
 ]

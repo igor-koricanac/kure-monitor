@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 import logging
 import traceback
 import asyncio
@@ -267,21 +267,35 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
     notification_service = deps.notification_service
 
     @router.get("/pods/failed", response_model=list[PodFailureResponse])
-    async def get_failed_pods():
-        """Get all failed pods from database"""
+    async def get_failed_pods(request: Request):
+        """Get all failed pods from database, filtered by user team namespaces if restricted."""
         try:
-            return await db.get_pod_failures()
+            failures = await db.get_pod_failures()
+            user = getattr(request.state, "user", None)
+            if user and user.get("role") != "admin":
+                perms = await db.get_user_effective_permissions(user)
+                if not perms.get("all_namespaces"):
+                    allowed_ns = set(perms.get("namespaces", []))
+                    failures = [p for p in failures if p.namespace in allowed_ns]
+            return failures
         except Exception as e:
             logger.error(f"Error getting pod failures: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/pods/ignored", response_model=list[PodFailureResponse])
-    async def get_ignored_pods():
-        """Get all ignored pods from database"""
+    async def get_ignored_pods(request: Request):
+        """Get all ignored pods from database, filtered by user team namespaces if restricted."""
         try:
-            return await db.get_pod_failures(
+            failures = await db.get_pod_failures(
                 include_dismissed=True, dismissed_only=True
             )
+            user = getattr(request.state, "user", None)
+            if user and user.get("role") != "admin":
+                perms = await db.get_user_effective_permissions(user)
+                if not perms.get("all_namespaces"):
+                    allowed_ns = set(perms.get("namespaces", []))
+                    failures = [p for p in failures if p.namespace in allowed_ns]
+            return failures
         except Exception as e:
             logger.error(f"Error getting ignored pods: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")

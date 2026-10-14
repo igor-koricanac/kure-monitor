@@ -41,14 +41,42 @@ class AcceptInvitationRequest(BaseModel):
     email: Optional[str] = Field(None, max_length=255)
 
 
-def _public_user(user: dict) -> dict:
-    """Return only the public-safe subset of a user row."""
-    return {
+def _public_user(user: dict, permissions: Optional[dict] = None) -> dict:
+    """Return the public-safe subset of a user row along with their effective permissions."""
+    data = {
         "id": user["id"],
         "username": user["username"],
         "email": user.get("email"),
         "role": user["role"],
     }
+    if permissions:
+        data.update({
+            "has_team": permissions.get("has_team", False),
+            "effective_access_level": permissions.get("access_level", "read"),
+            "effective_tabs": permissions.get("tabs", []),
+            "effective_namespaces": permissions.get("namespaces", []),
+            "all_namespaces": permissions.get("all_namespaces", False),
+            "teams": permissions.get("teams", []),
+        })
+    elif user.get("role") == "admin":
+        data.update({
+            "has_team": True,
+            "effective_access_level": "write",
+            "effective_tabs": ["pod_monitoring", "security_scanner", "diagram", "ai_advice", "admin"],
+            "effective_namespaces": [],
+            "all_namespaces": True,
+            "teams": [],
+        })
+    else:
+        data.update({
+            "has_team": user.get("has_team", False),
+            "effective_access_level": user.get("access_level", "read"),
+            "effective_tabs": user.get("tabs", []),
+            "effective_namespaces": user.get("namespaces", []),
+            "all_namespaces": user.get("all_namespaces", False),
+            "teams": user.get("teams", []),
+        })
+    return data
 
 
 def create_auth_router(deps: RouterDeps) -> APIRouter:
@@ -114,11 +142,12 @@ def create_auth_router(deps: RouterDeps) -> APIRouter:
 
     @router.get("/auth/me")
     async def get_me(user: dict = Depends(require_user)):
-        """Return the current authenticated user (fresh from DB)."""
+        """Return the current authenticated user (fresh from DB) with team permissions."""
         fresh = await db.get_user_by_id(user["id"])
         if not fresh:
             raise HTTPException(status_code=401, detail="User not found")
-        return {"user": _public_user(fresh)}
+        perms = await db.get_user_effective_permissions(fresh)
+        return {"user": _public_user(fresh, perms)}
 
     @router.get("/auth/invitation/{token}")
     async def get_invitation(token: str):

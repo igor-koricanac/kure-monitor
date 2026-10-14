@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -162,12 +162,22 @@ def build_router(deps: RouterDeps) -> APIRouter:
         "/scan",
         dependencies=[Depends(require_write)],
     )
-    async def scan_advice(body: AdviceScanRequest):
+    async def scan_advice(body: AdviceScanRequest, request: Request):
         if advice_engine is None:
             raise HTTPException(
                 status_code=503,
                 detail="Advice engine not configured",
             )
+        user = getattr(request.state, "user", None)
+        if user and user.get("role") != "admin":
+            perms = await db.get_user_effective_permissions(user)
+            if not perms.get("all_namespaces"):
+                allowed_ns = set(perms.get("namespaces", []))
+                if body.namespace not in allowed_ns:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied to namespace '{body.namespace}'",
+                    )
         scan_id = uuid.uuid4().hex
         scope = body.model_dump()
         logger.info("Advice scan starting (scan_id=%s, scope=%s)", scan_id, scope)
@@ -223,6 +233,7 @@ def build_router(deps: RouterDeps) -> APIRouter:
 
     @router.get("/findings")
     async def list_advice_findings(
+        request: Request,
         include_dismissed: bool = Query(False),
         dismissed_only: bool = Query(False),
         namespace: Optional[str] = Query(None),
@@ -236,10 +247,17 @@ def build_router(deps: RouterDeps) -> APIRouter:
             resource_kind=resource_kind,
             resource_name=resource_name,
         )
+        user = getattr(request.state, "user", None)
+        if user and user.get("role") != "admin":
+            perms = await db.get_user_effective_permissions(user)
+            if not perms.get("all_namespaces"):
+                allowed_ns = set(perms.get("namespaces", []))
+                rows = [r for r in rows if r.get("namespace") in allowed_ns]
         return {"findings": [_row_to_advice_finding(r) for r in rows]}
 
     @router.get("/findings/export")
     async def export_advice_findings(
+        request: Request,
         format: str = Query("json", pattern="^(json|csv)$"),
         include_dismissed: bool = Query(False),
         dismissed_only: bool = Query(False),
@@ -254,6 +272,12 @@ def build_router(deps: RouterDeps) -> APIRouter:
             resource_kind=resource_kind,
             resource_name=resource_name,
         )
+        user = getattr(request.state, "user", None)
+        if user and user.get("role") != "admin":
+            perms = await db.get_user_effective_permissions(user)
+            if not perms.get("all_namespaces"):
+                allowed_ns = set(perms.get("namespaces", []))
+                rows = [r for r in rows if r.get("namespace") in allowed_ns]
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if format == "csv":
             body = _findings_to_csv(rows)

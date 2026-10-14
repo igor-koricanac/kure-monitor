@@ -9,6 +9,7 @@ from .auth import require_read
 from .deps import RouterDeps
 from .routes_auth import create_auth_router
 from .routes_users import create_users_router
+from .routes_teams import create_teams_router
 from .routes_pods import create_pod_router, create_pod_ingest_router
 from .routes_security import create_security_router, create_security_ingest_router
 from .routes_admin import create_admin_router, create_admin_shared_router
@@ -94,6 +95,7 @@ def create_api_router(
     authed.include_router(create_logs_router(deps))
     authed.include_router(create_llm_router(deps))
     authed.include_router(create_users_router(deps))
+    authed.include_router(create_teams_router(deps))
     authed.include_router(create_diagram_router(deps))
     authed.include_router(create_advice_router(deps))
 

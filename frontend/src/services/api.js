@@ -221,6 +221,86 @@ export const api = {
   },
 
   // ============================================================
+  // Admin: Teams
+  // ============================================================
+  getTeams: async () => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
+  createTeam: async (data) => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, 'Failed to create team');
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  },
+
+  updateTeam: async (teamId, data) => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams/${teamId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, 'Failed to update team');
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  },
+
+  deleteTeam: async (teamId) => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams/${teamId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, 'Failed to delete team');
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json().catch(() => ({}));
+  },
+
+  addTeamMember: async (teamId, userId) => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams/${teamId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, 'Failed to add team member');
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  },
+
+  removeTeamMember: async (teamId, userId) => {
+    const response = await authFetch(`${API_BASE}/api/admin/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, 'Failed to remove team member');
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json().catch(() => ({}));
+  },
+
+  // ============================================================
   // App endpoints (all use cookie auth)
   // ============================================================
   getConfig: async () => {

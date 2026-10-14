@@ -117,11 +117,15 @@ export function useAuth() {
 
 /**
  * Convenience hook for components that want to know if the current user
- * is allowed to perform mutations. Only `admin` and `member` roles can write.
+ * is allowed to perform mutations.
+ * Admins always have write permissions.
+ * Non-admins have write permissions if granted via team membership.
  */
 export function useCanWrite() {
-  const { userRole } = useAuth();
-  return userRole === 'admin' || userRole === 'member';
+  const { user } = useAuth();
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return user.effective_access_level === 'write';
 }
 
 export function useIsAdmin() {

@@ -10,6 +10,7 @@ import RetentionSettings from './admin/RetentionSettings';
 import AdviceDetectorSettings from './admin/AdviceDetectorSettings';
 import UsersManager from './admin/UsersManager';
 import InvitationsManager from './admin/InvitationsManager';
+import TeamSettings from './admin/TeamSettings';
 
 const AdminPanel = ({ isDark = false, onConfigChange }) => {
   // Tab state
@@ -25,6 +26,7 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
     { id: 'exclusions', label: 'Suppressions', icon: EyeOff },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'teams', label: 'Teams', icon: Users },
     { id: 'invitations', label: 'Invitations', icon: Mail },
   ];
 
@@ -108,6 +110,10 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
 
       {activeTab === 'users' && (
         <UsersManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+      )}
+
+      {activeTab === 'teams' && (
+        <TeamSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
       )}
 
       {activeTab === 'invitations' && (

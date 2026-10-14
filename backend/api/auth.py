@@ -262,13 +262,25 @@ async def require_authenticated(request: Request) -> dict:
     return user
 
 
-# Legacy aliases. With the 2-role system, the only meaningful distinction is
-# admin vs. member, so every non-admin authenticated check collapses to
-# require_authenticated. These names are kept so existing route registrations
-# and test fixtures (dependency_overrides) keep working without churn.
 require_user = require_authenticated
 require_read = require_authenticated
-require_write = require_authenticated
+
+
+async def require_write(request: Request, user: dict = Depends(require_authenticated)) -> dict:
+    """Require user to have 'write' access level (either admin or via team membership)."""
+    if user.get("role") == "admin":
+        return user
+    db = getattr(request.app.state, "db", None)
+    if not db:
+        raise HTTPException(status_code=503, detail="Database not ready")
+    perms = await db.get_user_effective_permissions(user)
+    if perms.get("access_level") != "write":
+        raise HTTPException(
+            status_code=403,
+            detail="Write access required. Contact an admin to update your team permissions.",
+        )
+    user.update(perms)
+    return user
 
 
 async def require_admin(user: dict = Depends(require_authenticated)) -> dict:
