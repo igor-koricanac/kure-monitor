@@ -40,6 +40,26 @@ def create_teams_router(deps: RouterDeps) -> APIRouter:
     router = APIRouter(dependencies=[Depends(require_admin)])
     db = deps.db
 
+    @router.get("/admin/cluster-namespaces")
+    async def list_cluster_namespaces() -> List[str]:
+        """List all live namespaces from the Kubernetes cluster for team assignments.
+        Falls back to database namespaces if the cluster API is unreachable."""
+        topology_svc = getattr(deps, "topology_service", None)
+        if topology_svc:
+            try:
+                namespaces = await topology_svc.list_namespaces(include_default=True)
+                if namespaces:
+                    return namespaces
+            except Exception as e:
+                logger.warning(f"Failed to fetch cluster namespaces via topology service: {e}")
+
+        # Fallback to DB
+        try:
+            return await db.get_all_namespaces()
+        except Exception as e:
+            logger.error(f"Failed to fetch namespaces from database fallback: {e}")
+            return []
+
     @router.get("/admin/teams")
     async def list_teams():
         """List all teams with member metadata, tabs, namespaces, and access level."""

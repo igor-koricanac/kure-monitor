@@ -159,6 +159,21 @@ describe('API Service', () => {
     });
   });
 
+  describe('getClusterNamespaces', () => {
+    test('fetches cluster namespaces successfully', async () => {
+      const mockNamespaces = ['default', 'kube-system', 'kure-system', 'production'];
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockNamespaces,
+      });
+
+      const result = await api.getClusterNamespaces();
+
+      expect(fetch).toHaveBeenCalledWith('/api/admin/cluster-namespaces', expect.any(Object));
+      expect(result).toEqual(mockNamespaces);
+    });
+  });
+
   describe('addExcludedNamespace', () => {
     test('adds excluded namespace successfully', async () => {
       fetch.mockResolvedValueOnce({

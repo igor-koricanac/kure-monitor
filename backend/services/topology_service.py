@@ -359,7 +359,9 @@ class TopologyService:
 
     # -- Public API ---------------------------------------------------------
 
-    async def list_namespaces(self, kind: Optional[str] = None) -> List[str]:
+    async def list_namespaces(
+        self, kind: Optional[str] = None, include_default: bool = False
+    ) -> List[str]:
         self._init_k8s()
 
         if kind is not None:
@@ -384,7 +386,7 @@ class TopologyService:
                 _meta_namespace(w)
                 for w in _items(result)
                 if _meta_namespace(w)
-                and _meta_namespace(w) not in KUBE_DEFAULT_NAMESPACES
+                and (include_default or _meta_namespace(w) not in KUBE_DEFAULT_NAMESPACES)
             }
             return sorted(namespaces)
 
@@ -396,7 +398,8 @@ class TopologyService:
         return sorted(
             _meta_name(n)
             for n in _items(ns_list)
-            if _meta_name(n) and _meta_name(n) not in KUBE_DEFAULT_NAMESPACES
+            if _meta_name(n)
+            and (include_default or _meta_name(n) not in KUBE_DEFAULT_NAMESPACES)
         )
 
     async def list_workloads(self, namespace: str, kind: str) -> List[str]:

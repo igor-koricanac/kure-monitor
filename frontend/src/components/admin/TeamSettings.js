@@ -36,7 +36,7 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
       const [teamsData, usersData, namespacesData] = await Promise.all([
         api.getTeams(),
         api.getUsers(),
-        api.getAllNamespaces().catch(() => []),
+        api.getClusterNamespaces().catch(() => api.getAllNamespaces().catch(() => [])),
       ]);
       setTeams(teamsData);
       setUsers(usersData);

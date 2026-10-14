@@ -475,6 +475,12 @@ export const api = {
     return response.json();
   },
 
+  getClusterNamespaces: async () => {
+    const response = await authFetch(`${API_BASE}/api/admin/cluster-namespaces`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
   addExcludedNamespace: async (namespace) => {
     const response = await authFetch(`${API_BASE}/api/admin/excluded-namespaces`, {
       method: 'POST',
