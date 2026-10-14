@@ -1,0 +1,31 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kure-monitor
+  namespace: kure-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ./helm
+      sourceRef:
+        kind: GitRepository
+        name: kure-monitor
+        namespace: flux-system
+      interval: 1m
+  install:
+    disableWait: true
+    remediation:
+      retries: 3
+  upgrade:
+    disableWait: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+    cleanupOnFail: true
+  values:
+    features:
+      podMonitoring: true
+      securityScan: true
+      diagram: true
+      aiAdvice: true
