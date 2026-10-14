@@ -958,12 +958,23 @@ const Dashboard = () => {
                   }`}
                 >
                   <Activity className="w-4 h-4" />
-                  <span>Active</span>
+                  <span>Failing pods</span>
                   {pods.length > 0 && (
                     <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800'}`}>
                       {pods.length}
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={() => setPodSubTab('live')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
+                    podSubTab === 'live'
+                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
+                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Server className="w-4 h-4" />
+                  <span>Live Pods</span>
                 </button>
                 <button
                   onClick={() => setPodSubTab('history')}
@@ -996,17 +1007,6 @@ const Dashboard = () => {
                       {ignoredPods.length}
                     </span>
                   )}
-                </button>
-                <button
-                  onClick={() => setPodSubTab('live')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
-                    podSubTab === 'live'
-                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
-                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Server className="w-4 h-4" />
-                  <span>Live Pods</span>
                 </button>
               </div>
 

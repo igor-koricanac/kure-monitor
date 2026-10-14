@@ -93,8 +93,22 @@ describe('LivePodsTable', () => {
       expect(screen.getByText('kure-monitor-backend-6b7986b6c5-ntqbm')).toBeInTheDocument();
     });
 
-    const logButtons = screen.getAllByTitle('View logs');
+    const logButtons = screen.getAllByTitle('View logs snapshot');
     fireEvent.click(logButtons[0]);
+
+    expect(screen.getByTestId('mock-pod-logs-modal')).toBeInTheDocument();
+    expect(screen.getByText('Logs for kure-monitor-backend-6b7986b6c5-ntqbm')).toBeInTheDocument();
+  });
+
+  test('opens logs modal with autoStream on Live button click', async () => {
+    render(<LivePodsTable isAdmin={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('kure-monitor-backend-6b7986b6c5-ntqbm')).toBeInTheDocument();
+    });
+
+    const liveButtons = screen.getAllByTitle('Live stream logs');
+    fireEvent.click(liveButtons[0]);
 
     expect(screen.getByTestId('mock-pod-logs-modal')).toBeInTheDocument();
     expect(screen.getByText('Logs for kure-monitor-backend-6b7986b6c5-ntqbm')).toBeInTheDocument();

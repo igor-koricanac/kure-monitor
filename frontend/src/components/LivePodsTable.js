@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Terminal, Search, RefreshCw, AlertCircle, Server } from 'lucide-react';
+import { Terminal, Search, RefreshCw, AlertCircle, Server, Play } from 'lucide-react';
 import { api } from '../services/api';
 import PodLogsModal from './PodLogsModal';
 
@@ -252,7 +252,19 @@ const LivePodsTable = ({ isDark = false, userAllowedNamespaces = null, isAdmin =
                     <td className="px-4 py-2.5 whitespace-nowrap font-mono text-gray-500 dark:text-gray-400">
                       {getAge(pod.created_at)}
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-2.5 whitespace-nowrap text-right space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setSelectedLogPod({ ...pod, autoStream: true })}
+                        className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                          isDark
+                            ? 'bg-green-900/50 hover:bg-green-800/60 text-green-300 border-green-700'
+                            : 'bg-green-50 hover:bg-green-100 text-green-700 border-green-300'
+                        }`}
+                        title="Live stream logs"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Live</span>
+                      </button>
                       <button
                         onClick={() => setSelectedLogPod(pod)}
                         className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
@@ -260,7 +272,7 @@ const LivePodsTable = ({ isDark = false, userAllowedNamespaces = null, isAdmin =
                             ? 'bg-gray-700 hover:bg-gray-600 text-blue-300 border-gray-600'
                             : 'bg-white hover:bg-gray-50 text-blue-600 border-gray-300'
                         }`}
-                        title="View logs"
+                        title="View logs snapshot"
                       >
                         <Terminal className="w-3 h-3" />
                         <span>Logs</span>

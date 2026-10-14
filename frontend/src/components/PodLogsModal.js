@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Loader2, AlertTriangle, Terminal, RotateCcw, Download, ArrowDown } from 'lucide-react';
+import { X, Loader2, AlertTriangle, Terminal, RotateCcw, Download, ArrowDown, Play, Square } from 'lucide-react';
 import { api } from '../services/api';
 import useModalA11y from '../hooks/useModalA11y';
 
@@ -12,9 +12,11 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
   const [selectedContainer, setSelectedContainer] = useState('');
   const [showPrevious, setShowPrevious] = useState(false);
   const [tailLines, setTailLines] = useState(100);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const logsContainerRef = useRef(null);
   const dialogRef = useRef(null);
+  const eventSourceRef = useRef(null);
 
   useModalA11y({ isOpen, onClose, dialogRef });
 
@@ -30,10 +32,19 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
     }
   }, [containers, selectedContainer]);
 
-  // Fetch logs
+  const stopStreaming = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setIsStreaming(false);
+  }, []);
+
+  // Fetch static snapshot of logs
   const fetchLogs = useCallback(async () => {
     if (!pod || !selectedContainer || !podName) return;
 
+    stopStreaming();
     setLoading(true);
     setError(null);
 
@@ -51,22 +62,74 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [pod, selectedContainer, tailLines, showPrevious]);
+  }, [pod, selectedContainer, tailLines, showPrevious, stopStreaming]);
+
+  // Start live SSE streaming
+  const startStreaming = useCallback(() => {
+    if (!pod || !selectedContainer || !podName) return;
+
+    stopStreaming();
+    setError(null);
+    setIsStreaming(true);
+
+    const streamUrl = api.getStreamingLogsUrl(pod.namespace, podName, {
+      container: selectedContainer,
+      tailLines: tailLines,
+    });
+
+    const es = new EventSource(streamUrl, { withCredentials: true });
+    eventSourceRef.current = es;
+
+    es.onmessage = (event) => {
+      if (event.data) {
+        setLogs((prev) => (prev ? `${prev}\n${event.data}` : event.data));
+        // Auto scroll down while streaming
+        if (logsContainerRef.current) {
+          logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+        }
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource failed or closed
+      stopStreaming();
+    };
+  }, [pod, selectedContainer, podName, tailLines, stopStreaming]);
+
+  const toggleStreaming = () => {
+    if (isStreaming) {
+      stopStreaming();
+    } else {
+      startStreaming();
+    }
+  };
 
   // Load logs when modal opens or settings change
   useEffect(() => {
     if (isOpen && pod && selectedContainer) {
-      fetchLogs();
+      if (pod.autoStream) {
+        startStreaming();
+      } else if (!isStreaming) {
+        fetchLogs();
+      }
     }
-  }, [isOpen, pod, selectedContainer, tailLines, showPrevious, fetchLogs]);
+  }, [isOpen, pod, selectedContainer, tailLines, showPrevious, fetchLogs, isStreaming, startStreaming]);
 
-  // Reset state when modal closes
+  // Clean up streaming and reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
+      stopStreaming();
       setLogs('');
       setError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, stopStreaming]);
+
+  // Clean up streaming on unmount
+  useEffect(() => {
+    return () => {
+      stopStreaming();
+    };
+  }, [stopStreaming]);
 
   // Download logs
   const downloadLogs = () => {
@@ -176,10 +239,35 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* Live stream Play / Stop button */}
+            <button
+              onClick={toggleStreaming}
+              className={`inline-flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                isStreaming
+                  ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
+                  : isDark
+                  ? 'bg-green-900/60 text-green-300 hover:bg-green-800 border border-green-700'
+                  : 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300'
+              }`}
+              title={isStreaming ? 'Stop live log streaming' : 'Stream live logs (follow)'}
+            >
+              {isStreaming ? (
+                <>
+                  <Square className="w-3.5 h-3.5 mr-1.5 fill-current" />
+                  <span>Stop Live</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />
+                  <span>Live Stream</span>
+                </>
+              )}
+            </button>
+
             {/* Refresh button */}
             <button
               onClick={fetchLogs}
-              disabled={loading}
+              disabled={loading || isStreaming}
               className={`inline-flex items-center px-3 py-1.5 rounded text-sm font-medium disabled:opacity-50 ${
                 isDark
                   ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-800/50'
