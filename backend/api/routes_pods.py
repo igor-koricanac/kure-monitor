@@ -16,6 +16,13 @@ from services.prometheus_metrics import POD_FAILURES_TOTAL
 from .auth import require_write, require_service_token
 from .deps import RouterDeps
 
+try:
+    from kubernetes import client, config
+
+    K8S_AVAILABLE = True
+except ImportError:
+    K8S_AVAILABLE = False
+
 
 class DismissDeletedPodRequest(BaseModel):
     """Agent-side notification that a pod was deleted from K8s; auto-resolves
@@ -611,5 +618,104 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
         except Exception as e:
             logger.error(f"Error setting ignored retention: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
+
+    @router.get("/pods/live")
+    async def get_live_pods(request: Request, namespace: Optional[str] = None):
+        """Get live pods from Kubernetes cluster, filtered by namespace and user team permissions."""
+        if not K8S_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Kubernetes client not available")
+
+        # Determine user allowed namespaces
+        user = getattr(request.state, "user", None)
+        allowed_namespaces = None
+        if user and user.get("role") != "admin":
+            perms = await db.get_user_effective_permissions(user)
+            if not perms.get("all_namespaces"):
+                allowed_namespaces = set(perms.get("namespaces", []))
+                if not allowed_namespaces:
+                    return {"pods": [], "namespaces": []}
+
+        # Validate requested namespace against user permissions
+        if namespace and allowed_namespaces is not None and namespace not in allowed_namespaces:
+            raise HTTPException(status_code=403, detail=f"Access denied to namespace '{namespace}'")
+
+        try:
+            try:
+                config.load_incluster_config()
+            except Exception:
+                config.load_kube_config()
+            v1 = client.CoreV1Api()
+        except Exception as e:
+            logger.error(f"Failed to configure Kubernetes client: {e}")
+            raise HTTPException(status_code=503, detail="Could not configure Kubernetes client")
+
+        try:
+            # Query pods
+            if namespace:
+                pod_list = await asyncio.to_thread(v1.list_namespaced_pod, namespace=namespace)
+                items = pod_list.items
+            else:
+                pod_list = await asyncio.to_thread(v1.list_pod_for_all_namespaces)
+                items = pod_list.items
+                if allowed_namespaces is not None:
+                    items = [p for p in items if p.metadata and p.metadata.namespace in allowed_namespaces]
+
+            results = []
+            for pod in items:
+                meta = pod.metadata
+                spec = pod.spec
+                status = pod.status
+                container_statuses = status.container_statuses or [] if status else []
+
+                ready_count = sum(1 for cs in container_statuses if cs.ready)
+                total_containers = len(spec.containers) if spec and spec.containers else len(container_statuses)
+                restart_count = sum(cs.restart_count for cs in container_statuses)
+
+                # Determine human status
+                phase = status.phase if status and status.phase else "Unknown"
+                status_reason = phase
+
+                # Check waiting reasons in containers
+                for cs in container_statuses:
+                    if cs.state and cs.state.waiting and cs.state.waiting.reason:
+                        status_reason = cs.state.waiting.reason
+                        break
+                    elif cs.state and cs.state.terminated and cs.state.terminated.reason:
+                        status_reason = cs.state.terminated.reason
+                        break
+
+                creation_ts = meta.creation_timestamp.isoformat() if meta and meta.creation_timestamp else None
+
+                containers_info = [
+                    {
+                        "name": cs.name,
+                        "ready": cs.ready,
+                        "restart_count": cs.restart_count,
+                        "image": cs.image,
+                    }
+                    for cs in container_statuses
+                ]
+
+                results.append({
+                    "name": meta.name if meta else "",
+                    "namespace": meta.namespace if meta else "",
+                    "phase": phase,
+                    "status_reason": status_reason,
+                    "ready": f"{ready_count}/{total_containers}",
+                    "ready_count": ready_count,
+                    "total_containers": total_containers,
+                    "restarts": restart_count,
+                    "created_at": creation_ts,
+                    "node_name": spec.node_name if spec else None,
+                    "pod_ip": status.pod_ip if status else None,
+                    "container_statuses": containers_info,
+                })
+
+            # Sort by namespace then pod name
+            results.sort(key=lambda p: (p["namespace"], p["name"]))
+            return {"pods": results}
+        except Exception as e:
+            logger.error(f"Error fetching live pods: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router

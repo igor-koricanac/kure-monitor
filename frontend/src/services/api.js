@@ -315,6 +315,15 @@ export const api = {
     return response.json();
   },
 
+  getLivePods: async (namespace = '') => {
+    const url = namespace
+      ? `${API_BASE}/api/pods/live?namespace=${encodeURIComponent(namespace)}`
+      : `${API_BASE}/api/pods/live`;
+    const response = await authFetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
   dismissPod: async (podId) => {
     const response = await authFetch(`${API_BASE}/api/pods/failed/${podId}`, {
       method: 'DELETE'

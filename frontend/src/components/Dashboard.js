@@ -7,6 +7,7 @@ import AdminPanel from './AdminPanel';
 import SetupBanner from './SetupBanner';
 import DiagramTab from './Diagram/DiagramTab';
 import AdvicePanel from './AdvicePanel';
+import LivePodsTable from './LivePodsTable';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -743,8 +744,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Filters - hide on admin, diagram, and advice tabs */}
-        {activeTab !== 'admin' && activeTab !== 'diagram' && activeTab !== 'advice' && (
+        {/* Filters - hide on admin, diagram, and advice tabs, or when on live pods subtab */}
+        {activeTab !== 'admin' && activeTab !== 'diagram' && activeTab !== 'advice' && !(activeTab === 'monitoring' && podSubTab === 'live') && (
         <div className="flex justify-end mb-4 gap-4">
           {/* Severity Filter - only show on security tab */}
           {activeTab === 'security' && (
@@ -996,6 +997,17 @@ const Dashboard = () => {
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => setPodSubTab('live')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
+                    podSubTab === 'live'
+                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
+                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Server className="w-4 h-4" />
+                  <span>Live Pods</span>
+                </button>
               </div>
 
               {/* Active sub-tab */}
@@ -1058,6 +1070,15 @@ const Dashboard = () => {
                     <PodTable pods={filteredIgnored} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} onDeleteRecord={handleDeletePodRecord} isDark={isDark} aiEnabled={aiEnabled} viewMode="ignored" canWrite={canWrite} />
                   )}
                 </>
+              )}
+
+              {/* Live Pods sub-tab */}
+              {podSubTab === 'live' && (
+                <LivePodsTable
+                  isDark={isDark}
+                  userAllowedNamespaces={user?.effective_namespaces || null}
+                  isAdmin={isAdmin}
+                />
               )}
             </>
           )}

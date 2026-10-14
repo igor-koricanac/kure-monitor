@@ -21,6 +21,8 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
   // Get container names from pod
   const containers = pod?.container_statuses?.map(c => c.name) || [];
 
+  const podName = pod?.pod_name || pod?.name;
+
   // Set default container when pod changes
   useEffect(() => {
     if (containers.length > 0 && !selectedContainer) {
@@ -30,13 +32,13 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
 
   // Fetch logs
   const fetchLogs = useCallback(async () => {
-    if (!pod || !selectedContainer) return;
+    if (!pod || !selectedContainer || !podName) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const data = await api.getPodLogs(pod.namespace, pod.pod_name, {
+      const data = await api.getPodLogs(pod.namespace, podName, {
         container: selectedContainer,
         tailLines: tailLines,
         previous: showPrevious
@@ -115,7 +117,7 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
             <Terminal className={`w-5 h-5 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
             <div>
               <h3 className={`text-lg font-medium ${textColor}`}>Pod Logs</h3>
-              <p className={`text-sm ${textMuted}`}>{pod?.namespace}/{pod?.pod_name}</p>
+              <p className={`text-sm ${textMuted}`}>{pod?.namespace}/{podName}</p>
             </div>
           </div>
           <button
