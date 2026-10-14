@@ -12,6 +12,7 @@ const AVAILABLE_TABS = [
 const TeamSettings = ({ isDark, onError, onSuccess }) => {
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
+  const [availableNamespaces, setAvailableNamespaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
@@ -22,18 +23,24 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
   const [accessLevel, setAccessLevel] = useState('read');
   const [allNamespaces, setAllNamespaces] = useState(false);
   const [selectedTabs, setSelectedTabs] = useState(['pod_monitoring']);
-  const [namespacesInput, setNamespacesInput] = useState('');
+  const [selectedNamespaces, setSelectedNamespaces] = useState([]);
+  const [namespaceSearch, setNamespaceSearch] = useState('');
+  const [showNamespaceDropdown, setShowNamespaceDropdown] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [teamsData, usersData] = await Promise.all([
+      const [teamsData, usersData, namespacesData] = await Promise.all([
         api.getTeams(),
         api.getUsers(),
+        api.getAllNamespaces().catch(() => []),
       ]);
       setTeams(teamsData);
       setUsers(usersData);
+      setAvailableNamespaces(namespacesData || []);
     } catch (err) {
       onError?.('Failed to load teams or users');
     } finally {
@@ -52,8 +59,12 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
     setAccessLevel('read');
     setAllNamespaces(false);
     setSelectedTabs(['pod_monitoring']);
-    setNamespacesInput('');
+    setSelectedNamespaces([]);
+    setNamespaceSearch('');
+    setShowNamespaceDropdown(false);
     setSelectedMemberIds([]);
+    setMemberSearch('');
+    setShowMemberDropdown(false);
     setIsModalOpen(true);
   };
 
@@ -64,8 +75,12 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
     setAccessLevel(team.access_level);
     setAllNamespaces(team.all_namespaces);
     setSelectedTabs(team.tabs || []);
-    setNamespacesInput((team.namespaces || []).join(', '));
+    setSelectedNamespaces(team.namespaces || []);
+    setNamespaceSearch('');
+    setShowNamespaceDropdown(false);
     setSelectedMemberIds((team.members || []).map((m) => m.id));
+    setMemberSearch('');
+    setShowMemberDropdown(false);
     setIsModalOpen(true);
   };
 
@@ -75,10 +90,30 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
     );
   };
 
-  const handleMemberToggle = (userId) => {
-    setSelectedMemberIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
+  const handleAddMember = (userId) => {
+    if (!selectedMemberIds.includes(userId)) {
+      setSelectedMemberIds((prev) => [...prev, userId]);
+    }
+    setMemberSearch('');
+    setShowMemberDropdown(false);
+  };
+
+  const handleRemoveMember = (userId) => {
+    setSelectedMemberIds((prev) => prev.filter((id) => id !== userId));
+  };
+
+  const handleAddNamespace = (ns) => {
+    const trimmed = ns.trim();
+    if (!trimmed) return;
+    if (!selectedNamespaces.includes(trimmed)) {
+      setSelectedNamespaces((prev) => [...prev, trimmed]);
+    }
+    setNamespaceSearch('');
+    setShowNamespaceDropdown(false);
+  };
+
+  const handleRemoveNamespace = (ns) => {
+    setSelectedNamespaces((prev) => prev.filter((item) => item !== ns));
   };
 
   const handleSubmit = async (e) => {
@@ -87,11 +122,6 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
       onError?.('Team name is required');
       return;
     }
-
-    const namespacesList = namespacesInput
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
 
     setSubmitting(true);
     try {
@@ -102,7 +132,7 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
           access_level: accessLevel,
           all_namespaces: allNamespaces,
           tabs: selectedTabs,
-          namespaces: namespacesList,
+          namespaces: selectedNamespaces,
         });
 
         // Sync members
@@ -125,7 +155,7 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
           access_level: accessLevel,
           all_namespaces: allNamespaces,
           tabs: selectedTabs,
-          namespaces: namespacesList,
+          namespaces: selectedNamespaces,
           member_ids: selectedMemberIds,
         });
         onSuccess?.(`Team "${name}" created successfully`);
@@ -428,15 +458,116 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
                   </label>
                 </div>
                 {!allNamespaces && (
-                  <input
-                    type="text"
-                    value={namespacesInput}
-                    onChange={(e) => setNamespacesInput(e.target.value)}
-                    placeholder="e.g. default, staging, payments (comma separated)"
-                    className={`w-full px-3 py-2 text-sm rounded-sm border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  />
+                  <div>
+                    {selectedNamespaces.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedNamespaces.map((ns) => (
+                          <span
+                            key={ns}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                              isDark
+                                ? 'bg-blue-900/40 text-blue-300 border-blue-700'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}
+                          >
+                            {ns}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveNamespace(ns)}
+                              className="ml-1.5 p-0.5 rounded hover:bg-red-500/20 hover:text-red-500 text-gray-400 transition-colors"
+                              title={`Remove ${ns}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={namespaceSearch}
+                        onChange={(e) => {
+                          setNamespaceSearch(e.target.value);
+                          setShowNamespaceDropdown(true);
+                        }}
+                        onFocus={() => setShowNamespaceDropdown(true)}
+                        placeholder="Type to filter or add namespace..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (namespaceSearch.trim()) {
+                              handleAddNamespace(namespaceSearch.trim());
+                            }
+                          } else if (e.key === 'Escape') {
+                            setShowNamespaceDropdown(false);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 text-sm rounded-sm border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          isDark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      {showNamespaceDropdown && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowNamespaceDropdown(false)}
+                          />
+                          <div
+                            className={`absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-sm border shadow-lg ${
+                              isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            {availableNamespaces
+                              .filter((ns) => !selectedNamespaces.includes(ns))
+                              .filter((ns) =>
+                                namespaceSearch.trim()
+                                  ? ns.toLowerCase().includes(namespaceSearch.toLowerCase().trim())
+                                  : true
+                              )
+                              .map((ns) => (
+                                <div
+                                  key={ns}
+                                  onClick={() => handleAddNamespace(ns)}
+                                  className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between ${
+                                    isDark
+                                      ? 'hover:bg-gray-700 text-gray-200'
+                                      : 'hover:bg-blue-50 text-gray-800'
+                                  }`}
+                                >
+                                  <span>{ns}</span>
+                                  <Plus className="w-3 h-3 opacity-60" />
+                                </div>
+                              ))}
+                            {namespaceSearch.trim() &&
+                              !availableNamespaces.includes(namespaceSearch.trim()) &&
+                              !selectedNamespaces.includes(namespaceSearch.trim()) && (
+                                <div
+                                  onClick={() => handleAddNamespace(namespaceSearch.trim())}
+                                  className={`px-3 py-1.5 text-xs cursor-pointer border-t font-medium ${
+                                    isDark
+                                      ? 'border-gray-700 bg-gray-750 hover:bg-gray-700 text-blue-400'
+                                      : 'border-gray-100 bg-gray-50 hover:bg-blue-50 text-blue-600'
+                                  }`}
+                                >
+                                  Add custom: &quot;{namespaceSearch.trim()}&quot;
+                                </div>
+                              )}
+                            {availableNamespaces.filter((ns) => !selectedNamespaces.includes(ns)).filter((ns) =>
+                              namespaceSearch.trim()
+                                ? ns.toLowerCase().includes(namespaceSearch.toLowerCase().trim())
+                                : true
+                            ).length === 0 &&
+                              (!namespaceSearch.trim() || selectedNamespaces.includes(namespaceSearch.trim())) && (
+                                <div className={`px-3 py-2 text-xs italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  No namespaces found
+                                </div>
+                              )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -476,49 +607,153 @@ const TeamSettings = ({ isDark, onError, onSuccess }) => {
                 <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                   Assign Team Members
                 </label>
-                <div
-                  className={`max-h-40 overflow-y-auto p-2 rounded-sm border divide-y ${
-                    isDark
-                      ? 'bg-gray-700/50 border-gray-600 divide-gray-600'
-                      : 'bg-gray-50 border-gray-200 divide-gray-200'
-                  }`}
-                >
-                  {users.length === 0 ? (
-                    <p className={`text-xs p-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No users available</p>
-                  ) : (
-                    users.map((u) => {
-                      const isSelected = selectedMemberIds.includes(u.id);
+
+                {/* Selected members chips */}
+                {selectedMemberIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedMemberIds.map((id) => {
+                      const user = users.find((u) => u.id === id);
+                      if (!user) return null;
                       return (
-                        <label
-                          key={u.id}
-                          className="flex items-center justify-between py-1.5 px-1 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                        <span
+                          key={id}
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                            isDark
+                              ? 'bg-purple-900/40 text-purple-300 border-purple-700'
+                              : 'bg-purple-50 text-purple-700 border-purple-200'
+                          }`}
                         >
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleMemberToggle(u.id)}
-                              className="mr-2.5 rounded text-blue-600"
-                            />
-                            <span className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {u.username}
+                          <span>{user.username}</span>
+                          {user.role === 'admin' && (
+                            <span
+                              className={`ml-1 text-[9px] px-1 rounded font-semibold ${
+                                isDark ? 'bg-yellow-900/60 text-yellow-300' : 'bg-yellow-200 text-yellow-800'
+                              }`}
+                            >
+                              admin
                             </span>
-                            {u.role === 'admin' && (
-                              <span
-                                className={`ml-2 text-[10px] px-1 py-0.2 rounded font-semibold ${
-                                  isDark ? 'bg-yellow-900/50 text-yellow-300' : 'bg-yellow-100 text-yellow-800'
-                                }`}
-                              >
-                                admin
-                              </span>
-                            )}
-                          </div>
-                          <span className={`text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {u.email || ''}
-                          </span>
-                        </label>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(id)}
+                            className="ml-1.5 p-0.5 rounded hover:bg-red-500/20 hover:text-red-500 text-gray-400 transition-colors"
+                            title={`Remove ${user.username}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
                       );
-                    })
+                    })}
+                  </div>
+                )}
+
+                {/* Searchable member input & dropdown */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={(e) => {
+                      setMemberSearch(e.target.value);
+                      setShowMemberDropdown(true);
+                    }}
+                    onFocus={() => setShowMemberDropdown(true)}
+                    placeholder="Search user by username or email..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const unselectedUsers = users.filter((u) => !selectedMemberIds.includes(u.id));
+                        const matching = unselectedUsers.filter(
+                          (u) =>
+                            u.username.toLowerCase().includes(memberSearch.toLowerCase().trim()) ||
+                            (u.email && u.email.toLowerCase().includes(memberSearch.toLowerCase().trim()))
+                        );
+                        if (matching.length > 0) {
+                          handleAddMember(matching[0].id);
+                        }
+                      } else if (e.key === 'Escape') {
+                        setShowMemberDropdown(false);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 text-sm rounded-sm border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
+
+                  {showMemberDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowMemberDropdown(false)}
+                      />
+                      <div
+                        className={`absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-sm border shadow-lg ${
+                          isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        {users
+                          .filter((u) => !selectedMemberIds.includes(u.id))
+                          .filter((u) => {
+                            if (!memberSearch.trim()) return true;
+                            const query = memberSearch.toLowerCase().trim();
+                            return (
+                              u.username.toLowerCase().includes(query) ||
+                              (u.email && u.email.toLowerCase().includes(query))
+                            );
+                          })
+                          .map((u) => (
+                            <div
+                              key={u.id}
+                              onClick={() => handleAddMember(u.id)}
+                              className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between ${
+                                isDark
+                                  ? 'hover:bg-gray-700 text-gray-200'
+                                  : 'hover:bg-purple-50 text-gray-800'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium">{u.username}</span>
+                                {u.role === 'admin' && (
+                                  <span
+                                    className={`text-[9px] px-1 rounded font-semibold ${
+                                      isDark
+                                        ? 'bg-yellow-900/50 text-yellow-300'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}
+                                  >
+                                    admin
+                                  </span>
+                                )}
+                                {u.email && (
+                                  <span className={`text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    ({u.email})
+                                  </span>
+                                )}
+                              </div>
+                              <Plus className="w-3 h-3 opacity-60" />
+                            </div>
+                          ))}
+                        {users
+                          .filter((u) => !selectedMemberIds.includes(u.id))
+                          .filter((u) => {
+                            if (!memberSearch.trim()) return true;
+                            const query = memberSearch.toLowerCase().trim();
+                            return (
+                              u.username.toLowerCase().includes(query) ||
+                              (u.email && u.email.toLowerCase().includes(query))
+                            );
+                          }).length === 0 && (
+                          <div className={`px-3 py-2 text-xs italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {users.length === 0
+                              ? 'No users registered'
+                              : selectedMemberIds.length === users.length
+                              ? 'All users already added'
+                              : 'No matching users found'}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
