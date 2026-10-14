@@ -285,3 +285,6 @@ k8s/
 
 # FluxRepo
 flux/base
+
+# VSCode
+website/.vscode
