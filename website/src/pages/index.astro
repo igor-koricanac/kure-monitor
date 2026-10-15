@@ -222,13 +222,13 @@ import '../tailwind.css';
               <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
                 <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
               </div>
-              <h3 class="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">Real-Time Detection</h3>
-              <p class="text-slate-600">Catch CrashLoopBackOff, OOMKilled, and Pending pods the moment they happen with Slack/Teams alerts.</p>
+              <h3 class="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">Pod Monitoring & Live Logs</h3>
+              <p class="text-slate-600">Track Failing Pods with instant AI remediation, inspect cluster-wide Live Pods, and stream real-time container logs with play/pause controls.</p>
             </div>
           </a>
         </div>
 
-        <!-- Row 2: 2 Centered Cards -->
+        <!-- Row 2: 2 Cards -->
         <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mt-8">
           <!-- Feature 4: Multi-LLM Support -->
           <a href="/features/multi-llm/" class="group bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col text-inherit no-underline">
@@ -271,6 +271,53 @@ import '../tailwind.css';
               </div>
               <h3 class="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">Custom Instructions (.md)</h3>
               <p class="text-slate-600">Teach AI models your cluster topology, service mesh quirks, and team standards. Write, import, and export instructions directly in Markdown without altering code or manifests.</p>
+            </div>
+          </a>
+        </div>
+
+        <!-- Row 3: 2 Enterprise Governance & Auth Cards -->
+        <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mt-8">
+          <!-- Feature 6: Teams & RBAC -->
+          <a href="/configuration/authentication/#teams--granular-rbac" class="group bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col text-inherit no-underline">
+            <div class="h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
+              <img 
+                src="/images/teams.png" 
+                alt="Teams and Granular RBAC Permissions" 
+                width="600"
+                height="340"
+                loading="lazy"
+                decoding="async"
+                class="w-full h-full object-cover object-top rounded shadow-sm border border-slate-200 group-hover:scale-[1.02] transition-transform" 
+              />
+            </div>
+            <div class="p-6 flex-1 flex flex-col">
+              <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+                <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">Teams & Granular RBAC</h3>
+              <p class="text-slate-600">Multi-tenant access control for your cluster. Scope engineer permissions by dashboard tab, namespace boundaries, and read/write mutating privileges.</p>
+            </div>
+          </a>
+
+          <!-- Feature 7: Keycloak SSO -->
+          <a href="/configuration/authentication/#keycloak-sso-integration" class="group bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col text-inherit no-underline">
+            <div class="h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
+              <img 
+                src="/images/edit_teams.png" 
+                alt="Granular Team Permissions and SSO Governance" 
+                width="600"
+                height="340"
+                loading="lazy"
+                decoding="async"
+                class="w-full h-full object-cover object-top rounded shadow-sm border border-slate-200 group-hover:scale-[1.02] transition-transform" 
+              />
+            </div>
+            <div class="p-6 flex-1 flex flex-col">
+              <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+                <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">Keycloak SSO</h3>
+              <p class="text-slate-600">Enterprise OIDC authentication with group-based access gating, admin role mapping, and secure client secrets via Kubernetes Secrets or runtime UI.</p>
             </div>
           </a>
         </div>

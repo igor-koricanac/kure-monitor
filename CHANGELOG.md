@@ -5,6 +5,14 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Headline changes:
+- **Teams & Granular Multi-Tenant RBAC (KAN-93)**: Multi-tenant team access control. Cluster admins can create teams, scope member access to specific namespaces (with live cluster namespace discovery) or all namespaces, assign allowed dashboard tabs (`pod_monitoring`, `security_scanner`, `diagram`, `ai_advice`), and set `read` vs `write` operational permissions.
+- **Pod Monitoring Views: Failing Pods & Live Pods (KAN-94)**: Split Pod Monitoring into dedicated "Failing pods" and "Live Pods" views. The Live Pods view inventories all cluster pods in real time (Ready count, Status, Restarts, Age, Node) with namespace filtering.
+- **Interactive Live Log Streaming (KAN-94)**: Added interactive live log streaming with Play/Pause controls. Users can stream real-time logs via Server-Sent Events (SSE) directly from either failing pods or healthy live pods, switch containers seamlessly, and download logs for offline analysis.
+- **Keycloak Enterprise SSO (KAN-96)**: OpenID Connect (OIDC) single sign-on support configured via Helm chart values or dynamically via the Admin UI. Includes optional group-based access gating (`allowed_groups`), automatic admin role/group mapping (`admin_role`, `admin_group`), and secure `clientSecret` injection via existing Kubernetes Secrets (`existingSecret`, `existingSecretKey`).
+
 ## [2.5.0] - 2026-09-09
 
 Headline changes:

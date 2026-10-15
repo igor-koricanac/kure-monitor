@@ -39,9 +39,27 @@ The solution always includes:
 - **Prevention tips**
 - **Useful kubectl commands**
 
-## Pod details
+## Dashboard views: Failing pods & Live Pods
 
-Click a failed pod to see:
+The **Pod Monitoring** section is split into two views:
+
+- **Failing pods**: Focuses strictly on pods requiring attention across lifecycle filters (**Active**, **History**, **Ignored**). Includes instant AI diagnoses, failure causes, container statuses, and remediation steps.
+- **Live Pods**: Cluster-wide inventory of all pods running in the selected namespace (or across all namespaces if granted access). Displays real-time pod name, readiness status (`1/1`, `2/2`), lifecycle phase (`Running`, `Completed`, `CrashLoopBackOff`), restart count, node, and age.
+
+![Live Pods Table and Real-Time Inventory](/images/live_pods.png)
+
+### Live Pods inspection & Live streaming logs
+
+From the **Live Pods** table, click the terminal/play icon on any pod to open the **Pod Logs** modal:
+
+- **Snapshot logs**: View static tail lines (50, 100, 500, 1000, 2000 lines) or view logs from a previous crashed container instance.
+- **Live stream (Play / Pause button)**: Click the **Play** button to establish a real-time Server-Sent Events (SSE) stream (`/api/pods/{ns}/{name}/logs/stream`). Logs stream continuously into the terminal viewer until paused or closed.
+- **Container switching**: Seamlessly toggle between containers in multi-container pods without leaving the viewer.
+- **Download**: Export the full log buffer directly to a `.txt` file for offline analysis or escalation tickets.
+
+## Pod details (Failing pods)
+
+Click any failed pod card in the **Failing pods** view to inspect:
 
 - **Pod metadata** — node, phase, creation time
 - **Error details** — failure reason and message
@@ -50,19 +68,13 @@ Click a failed pod to see:
 - **AI solution** — the generated guide
 - **Pod manifest** — with lines highlighted that the AI referenced
 
-## Live logs
+## Live logs for failing pods
 
-1. Expand the pod row
-2. Click **Logs**
-3. Pick a container (if multi-container)
-4. Pick a tail length (50 / 100 / 500 / 1000 / 2000 lines)
-5. Toggle **Previous container** to see logs from a crashed previous instance
-
-You can:
-
-- Download logs as a text file
-- Refresh / scroll to bottom
-- Switch container without leaving the panel
+1. Expand the pod row or click **Logs**
+2. Pick a container (if multi-container)
+3. Pick a tail length (50 / 100 / 500 / 1000 / 2000 lines)
+4. Toggle **Previous container** to see logs from a crashed previous instance
+5. Click **Play** to switch from snapshot to continuous live log streaming
 
 Logs stream over Server-Sent Events at `/api/pods/{ns}/{name}/logs/stream`.
 

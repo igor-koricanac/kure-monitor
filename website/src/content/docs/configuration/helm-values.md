@@ -141,6 +141,37 @@ prometheus:
     enabled: true
 ```
 
+## Keycloak SSO
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keycloak.enabled` | Enable Keycloak OIDC single sign-on | `false` |
+| `keycloak.serverUrl` | Keycloak server base URL (e.g. `https://keycloak.example.com`) | `""` |
+| `keycloak.realm` | Keycloak realm name | `""` |
+| `keycloak.clientId` | Keycloak client ID | `""` |
+| `keycloak.clientSecret` | Keycloak client secret (plain string) | `""` |
+| `keycloak.existingSecret` | Name of existing Kubernetes Secret containing client secret | `""` |
+| `keycloak.existingSecretKey` | Key within existingSecret containing client secret | `"client-secret"` |
+| `keycloak.adminRole` | Keycloak realm role mapped to Kure Monitor admin | `"kure-admin"` |
+| `keycloak.adminGroup` | Optional Keycloak group mapped to Kure Monitor admin | `""` |
+| `keycloak.allowedGroups` | Optional comma-separated list of allowed Keycloak groups | `""` |
+| `keycloak.scopes` | OIDC OAuth2 scopes | `"openid profile email"` |
+
+Example — configuring Keycloak with a pre-existing Kubernetes Secret:
+
+```yaml
+keycloak:
+  enabled: true
+  serverUrl: "https://auth.company.internal"
+  realm: "production"
+  clientId: "kure-monitor"
+  existingSecret: "kure-keycloak-credentials"
+  existingSecretKey: "client-secret"
+  adminRole: "kure-admin"
+  adminGroup: "sre-leads"
+  allowedGroups: "engineering,devops"
+```
+
 ## Auth-related values
 
 | Parameter | Description | Default |

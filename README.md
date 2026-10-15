@@ -28,16 +28,18 @@ Unlike tools such as K8sGPT that are CLI-focused, Kure gives you a unified web d
 
 **Core Diagnosis**
 - **AI-Powered Troubleshooting** — Get contextual solutions generated from pod events, logs, and manifest analysis using OpenAI, Anthropic, Groq, Google Gemini, GitHub Copilot (GitHub Models), or Ollama
-- **Real-time Failure Detection** — Know immediately when pods enter CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled, or other failure states
+- **Multi-LLM Profiles & Custom Instructions** — Register multiple AI providers with automatic failover, on-demand per-triage selection, and prepend custom Markdown (`.md`) cluster instructions
+- **Real-time Failure Detection & Live Pods** — Triage failing pods (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), inspect cluster-wide Live Pods, and stream real-time container logs with play/pause controls
 - **Security Scanning** — 50+ checks including privileged containers, host namespace access, dangerous capabilities, missing seccomp/AppArmor profiles, root containers, RBAC misconfigurations, untrusted image registries, and missing resource limits
 - **Pod Lifecycle Management** — Track pods through investigating, resolved, and ignored states with configurable history retention
 
-**Dashboard**
+**Dashboard & Enterprise Governance**
 - **Diagram Tab** — Interactive Kubernetes topology graph. Switch between per-namespace and per-workload views, click any node to view its manifest, click an edge to focus that path (highlights ancestors and descendants, dims everything else)
-- **Live Pod Logs** — Stream logs in real-time with container selection
+- **Live Pod Logs** — Real-time Server-Sent Events (SSE) log streaming with play/pause controls, multi-container selection, and offline export
 - **Export Findings** — Export security findings to CSV, JSON, and PDF
 - **Slack & Teams Notifications** — Get alerted when failures occur
-- **Dashboard Authentication** — User accounts with read/write/admin roles, session cookies, and rate-limited login
+- **Teams & Granular RBAC** — Multi-tenant team management with per-tab, per-namespace scoping, and read/write mutating privileges
+- **Keycloak SSO** — Enterprise OpenID Connect authentication with optional group gating, admin group mapping, and secure Kubernetes Secret integration
 - **Prometheus Metrics** — `/metrics` endpoint with optional ServiceMonitor support
 
 ## Limitations
