@@ -15,21 +15,32 @@ import SSOSettings from './admin/SSOSettings';
 
 const AdminPanel = ({ isDark = false, onConfigChange }) => {
   // Tab state
-  const [activeTab, setActiveTab] = useState('ai');
+  const [activeTab, setActiveTab] = useState('settings');
+  const [settingsSubTab, setSettingsSubTab] = useState('access');
+  const [accessSubTab, setAccessSubTab] = useState('users');
 
   // Error/success messages displayed at the top level
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
   const tabs = [
+    { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'ai', label: 'AI Config', icon: Bot },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'exclusions', label: 'Suppressions', icon: EyeOff },
-    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const settingsSubTabs = [
+    { id: 'access', label: 'Users & Teams', icon: Users },
+    { id: 'sso', label: 'SSO / Keycloak', icon: KeyRound },
+    { id: 'retention', label: 'Retention & Limits', icon: Settings },
+    { id: 'detectors', label: 'Advice Detectors', icon: Settings },
+  ];
+
+  const accessSubTabs = [
     { id: 'users', label: 'Users', icon: Users },
     { id: 'teams', label: 'Teams', icon: Users },
     { id: 'invitations', label: 'Invitations', icon: Mail },
-    { id: 'sso', label: 'SSO / Keycloak', icon: KeyRound },
   ];
 
   const handleSuccess = useCallback((message) => {
@@ -44,7 +55,7 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
 
   return (
     <div className="p-6">
-      {/* Tab Navigation */}
+      {/* Top Level Tab Navigation */}
       <div className={`flex border-b mb-6 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -90,16 +101,95 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
       )}
 
       {/* Tab Content */}
+      {activeTab === 'settings' && (
+        <div>
+          {/* Settings Sub-Tabs Navigation */}
+          <div className={`flex space-x-2 border-b mb-6 pb-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            {settingsSubTabs.map((subTab) => {
+              const Icon = subTab.icon;
+              const isActive = settingsSubTab === subTab.id;
+              return (
+                <button
+                  key={subTab.id}
+                  onClick={() => setSettingsSubTab(subTab.id)}
+                  className={`flex items-center px-3 py-1.5 text-xs sm:text-sm font-medium rounded-sm transition-colors ${
+                    isActive
+                      ? isDark
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-600 text-white'
+                      : isDark
+                        ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 mr-1.5" />
+                  {subTab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Settings Sub-Tab: Users & Teams */}
+          {settingsSubTab === 'access' && (
+            <div>
+              {/* Nested Pills for Users, Teams, Invitations */}
+              <div className="flex space-x-2 mb-6">
+                {accessSubTabs.map((pill) => {
+                  const Icon = pill.icon;
+                  const isPillActive = accessSubTab === pill.id;
+                  return (
+                    <button
+                      key={pill.id}
+                      onClick={() => setAccessSubTab(pill.id)}
+                      className={`flex items-center px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        isPillActive
+                          ? isDark
+                            ? 'bg-blue-900/40 border-blue-500 text-blue-300'
+                            : 'bg-blue-50 border-blue-500 text-blue-700'
+                          : isDark
+                            ? 'border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-200'
+                            : 'border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-800'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3 mr-1.5" />
+                      {pill.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {accessSubTab === 'users' && (
+                <UsersManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+              )}
+              {accessSubTab === 'teams' && (
+                <TeamSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+              )}
+              {accessSubTab === 'invitations' && (
+                <InvitationsManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+              )}
+            </div>
+          )}
+
+          {/* Settings Sub-Tab: SSO / Keycloak */}
+          {settingsSubTab === 'sso' && (
+            <SSOSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+          )}
+
+          {/* Settings Sub-Tab: Retention & Limits */}
+          {settingsSubTab === 'retention' && (
+            <RetentionSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+          )}
+
+          {/* Settings Sub-Tab: Advice Detectors */}
+          {settingsSubTab === 'detectors' && (
+            <AdviceDetectorSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+          )}
+        </div>
+      )}
+
       {activeTab === 'ai' && <LLMSettings isDark={isDark} onConfigChange={onConfigChange} />}
 
       {activeTab === 'notifications' && <NotificationSettings isDark={isDark} />}
-
-      {activeTab === 'settings' && (
-        <div className="space-y-8">
-          <RetentionSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-          <AdviceDetectorSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-        </div>
-      )}
 
       {activeTab === 'exclusions' && (
         <div className="space-y-8">
@@ -108,22 +198,6 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
           <ExclusionRules isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
           <ExclusionRegistries isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
         </div>
-      )}
-
-      {activeTab === 'users' && (
-        <UsersManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-      )}
-
-      {activeTab === 'teams' && (
-        <TeamSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-      )}
-
-      {activeTab === 'invitations' && (
-        <InvitationsManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-      )}
-
-      {activeTab === 'sso' && (
-        <SSOSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
       )}
     </div>
   );

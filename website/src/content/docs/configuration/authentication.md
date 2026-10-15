@@ -13,7 +13,7 @@ Both local auth and service tokens are wired up automatically by the Helm chart 
 
 ## Dashboard (user accounts & base roles)
 
-On first visit, the dashboard prompts the very first user to create the initial **admin** account (username + password). Once signed in, invite further users from **Admin Panel → Users** and assign a base role:
+On first visit, the dashboard prompts the very first user to create the initial **admin** account (username + password). Once signed in, invite further users from **Admin → Settings → Users & Teams** and assign a base role:
 
 | Role  | Description |
 |-------|-------------|
@@ -24,7 +24,7 @@ Sessions are carried in an HttpOnly cookie called `kure_session`, signed with `S
 
 ## Teams & Granular RBAC
 
-Kure Monitor provides multi-tenant team access control to restrict what engineers can view and mutate across the cluster. Administrators manage teams from **Admin Panel → Teams**:
+Kure Monitor provides multi-tenant team access control to restrict what engineers can view and mutate across the cluster. Administrators manage teams from **Admin → Settings → Users & Teams → Teams**:
 
 ![Team Management Overview](/images/teams.png)
 
@@ -75,7 +75,7 @@ keycloak:
 
 Administrators can also configure and test Keycloak SSO at runtime:
 
-1. Navigate to **Admin Panel → SSO Settings**.
+1. Navigate to **Admin → Settings → SSO / Keycloak**.
 2. Toggle **Enable Keycloak SSO**.
 3. Supply the **Server URL**, **Realm**, **Client ID**, and **Client Secret**.
 4. Configure optional role and group mappings:
