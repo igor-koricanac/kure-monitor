@@ -350,3 +350,10 @@ class LLMConfigMixin:
                     value = EXCLUDED.value,
                     updated_at = CURRENT_TIMESTAMP
             """, key, value)
+
+    async def delete_app_setting(self, key: str) -> bool:
+        """Delete an app setting by key"""
+        async with self._acquire() as conn:
+            result = await conn.execute("DELETE FROM app_settings WHERE key = $1", key)
+            count = int(result.split()[-1]) if result else 0
+            return count > 0

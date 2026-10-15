@@ -516,9 +516,11 @@ class PostgreSQLDatabase(
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
                         username VARCHAR(64) UNIQUE NOT NULL,
-                        password_hash VARCHAR(255) NOT NULL,
+                        password_hash VARCHAR(255),
                         email VARCHAR(255),
                         role VARCHAR(16) NOT NULL CHECK (role IN ('admin', 'member')),
+                        sso_provider VARCHAR(32),
+                        sso_sub VARCHAR(255),
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
@@ -548,6 +550,23 @@ class PostgreSQLDatabase(
                 """)
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token)
+                """)
+
+                # Migration for SSO / Keycloak:
+                # 1. Allow password_hash to be NULL for SSO-only accounts
+                # 2. Add sso_provider and sso_sub columns
+                await conn.execute("""
+                    ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL
+                """)
+                await conn.execute("""
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_provider VARCHAR(32)
+                """)
+                await conn.execute("""
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_sub VARCHAR(255)
+                """)
+                await conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_sub)
+                    WHERE sso_provider IS NOT NULL AND sso_sub IS NOT NULL
                 """)
 
                 # Migration: consolidate 3-role system ('admin','write','read')

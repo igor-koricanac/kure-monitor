@@ -263,6 +263,9 @@ class Database:
     async def set_app_setting(self, key, value):
         return await self._db.set_app_setting(key, value)
 
+    async def delete_app_setting(self, key):
+        return await self._db.delete_app_setting(key)
+
     # Pod record deletion methods
     async def delete_pod_failure(self, failure_id):
         return await self._db.delete_pod_failure(failure_id)
@@ -306,14 +309,38 @@ class Database:
     async def count_admins(self):
         return await self._db.count_admins()
 
-    async def create_user(self, username, password_hash, role, email=None):
-        return await self._db.create_user(username, password_hash, role, email)
+    async def create_user(
+        self,
+        username,
+        password_hash,
+        role,
+        email=None,
+        sso_provider=None,
+        sso_sub=None,
+    ):
+        return await self._db.create_user(
+            username,
+            password_hash,
+            role,
+            email,
+            sso_provider,
+            sso_sub,
+        )
 
     async def get_user_by_id(self, user_id):
         return await self._db.get_user_by_id(user_id)
 
     async def get_user_by_username(self, username):
         return await self._db.get_user_by_username(username)
+
+    async def get_user_by_email(self, email):
+        return await self._db.get_user_by_email(email)
+
+    async def get_user_by_sso(self, provider, sub):
+        return await self._db.get_user_by_sso(provider, sub)
+
+    async def upsert_sso_user(self, username, email, provider, sub, role=None):
+        return await self._db.upsert_sso_user(username, email, provider, sub, role)
 
     async def list_users(self):
         return await self._db.list_users()

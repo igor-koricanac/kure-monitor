@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { AlertCircle, CheckCircle, Bot, Bell, EyeOff, Settings, Users, Mail } from 'lucide-react';
+import { AlertCircle, CheckCircle, Bot, Bell, EyeOff, Settings, Users, Mail, KeyRound } from 'lucide-react';
 import NotificationSettings from './NotificationSettings';
 import LLMSettings from './LLMSettings';
 import ExclusionNamespaces from './admin/ExclusionNamespaces';
@@ -11,6 +11,7 @@ import AdviceDetectorSettings from './admin/AdviceDetectorSettings';
 import UsersManager from './admin/UsersManager';
 import InvitationsManager from './admin/InvitationsManager';
 import TeamSettings from './admin/TeamSettings';
+import SSOSettings from './admin/SSOSettings';
 
 const AdminPanel = ({ isDark = false, onConfigChange }) => {
   // Tab state
@@ -28,6 +29,7 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
     { id: 'users', label: 'Users', icon: Users },
     { id: 'teams', label: 'Teams', icon: Users },
     { id: 'invitations', label: 'Invitations', icon: Mail },
+    { id: 'sso', label: 'SSO / Keycloak', icon: KeyRound },
   ];
 
   const handleSuccess = useCallback((message) => {
@@ -118,6 +120,10 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
 
       {activeTab === 'invitations' && (
         <InvitationsManager isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
+      )}
+
+      {activeTab === 'sso' && (
+        <SSOSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
       )}
     </div>
   );

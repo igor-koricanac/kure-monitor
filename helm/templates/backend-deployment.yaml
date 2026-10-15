@@ -94,6 +94,33 @@ spec:
             secretKeyRef:
               name: {{ include "kure.fullname" . }}-bootstrap
               key: session-secret
+        {{- if and .Values.keycloak .Values.keycloak.enabled }}
+        - name: KEYCLOAK_ENABLED
+          value: "true"
+        - name: KEYCLOAK_SERVER_URL
+          value: {{ .Values.keycloak.serverUrl | quote }}
+        - name: KEYCLOAK_REALM
+          value: {{ .Values.keycloak.realm | quote }}
+        - name: KEYCLOAK_CLIENT_ID
+          value: {{ .Values.keycloak.clientId | quote }}
+        - name: KEYCLOAK_CLIENT_SECRET
+          {{- if .Values.keycloak.existingSecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.keycloak.existingSecret }}
+              key: {{ .Values.keycloak.existingSecretKey | default "client-secret" }}
+          {{- else }}
+          value: {{ .Values.keycloak.clientSecret | quote }}
+          {{- end }}
+        - name: KEYCLOAK_ADMIN_ROLE
+          value: {{ .Values.keycloak.adminRole | default "kure-admin" | quote }}
+        - name: KEYCLOAK_ADMIN_GROUP
+          value: {{ .Values.keycloak.adminGroup | default "" | quote }}
+        - name: KEYCLOAK_ALLOWED_GROUPS
+          value: {{ .Values.keycloak.allowedGroups | default "" | quote }}
+        - name: KEYCLOAK_SCOPES
+          value: {{ .Values.keycloak.scopes | default "openid profile email" | quote }}
+        {{- end }}
         volumeMounts:
         - name: tmp
           mountPath: /tmp

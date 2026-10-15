@@ -239,6 +239,21 @@ postgresql:
 security:
   encryptionKey: ""  # Fernet key for API key encryption (auto-generated if empty)
 
+# Keycloak SSO configuration
+keycloak:
+  enabled: false
+  serverUrl: ""       # e.g., "https://keycloak.example.com" or "http://keycloak.default.svc.cluster.local:8080"
+  realm: ""           # e.g., "kure"
+  clientId: ""        # e.g., "kure-monitor"
+  clientSecret: ""    # Keycloak client secret (plain string in values)
+  # Or provide via existing Kubernetes Secret for security:
+  existingSecret: ""  # Name of existing Kubernetes Secret containing Keycloak client secret
+  existingSecretKey: "client-secret"  # Key within existingSecret (default: client-secret)
+  adminRole: "kure-admin"  # Keycloak realm role mapped to Kure Monitor admin
+  adminGroup: ""      # Keycloak group mapped to Kure Monitor admin (optional)
+  allowedGroups: ""   # Comma-separated list of allowed Keycloak groups (optional, e.g. "developers,platform-team")
+  scopes: "openid profile email"
+
 # Prometheus metrics configuration
 prometheus:
   enabled: false          # Enable Prometheus metrics integration

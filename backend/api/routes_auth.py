@@ -5,7 +5,8 @@ import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from .auth import (
@@ -15,12 +16,32 @@ from .auth import (
     hash_password,
     issue_session_cookie,
     record_failed_login,
+    require_admin,
     require_user,
     verify_password,
+)
+from .auth_sso import (
+    build_authorization_url,
+    exchange_code_for_token,
+    get_sso_config,
+    get_user_info,
+    save_sso_config,
 )
 from .deps import RouterDeps
 
 logger = logging.getLogger(__name__)
+
+
+class SSOSettingsRequest(BaseModel):
+    enabled: bool = False
+    server_url: str = ""
+    realm: str = ""
+    client_id: str = ""
+    client_secret: Optional[str] = None
+    admin_role: Optional[str] = "kure-admin"
+    admin_group: Optional[str] = ""
+    allowed_groups: Optional[str] = ""
+    scopes: Optional[str] = "openid profile email"
 
 
 class SetupRequest(BaseModel):
@@ -139,6 +160,210 @@ def create_auth_router(deps: RouterDeps) -> APIRouter:
         """Clear session cookie."""
         clear_session_cookie(response)
         return Response(status_code=204)
+
+    # --- SSO / Keycloak Endpoints ---
+
+    @router.get("/auth/sso/config")
+    async def get_public_sso_config():
+        """Public endpoint returning whether SSO is enabled."""
+        cfg = await get_sso_config(db, include_secret=False)
+        return {
+            "enabled": cfg["enabled"],
+            "provider": "keycloak",
+            "name": "Keycloak",
+        }
+
+    @router.get("/auth/sso/login")
+    async def sso_login(request: Request):
+        """Redirect user to Keycloak login."""
+        cfg = await get_sso_config(db, include_secret=True)
+        if not cfg["enabled"]:
+            raise HTTPException(status_code=400, detail="SSO is not enabled")
+        if not cfg["server_url"] or not cfg["realm"] or not cfg["client_id"]:
+            raise HTTPException(
+                status_code=500, detail="Keycloak SSO is not properly configured"
+            )
+
+        # Generate state token
+        state = secrets.token_urlsafe(32)
+        # Store state in DB with a short TTL (10 mins)
+        await db.set_app_setting(f"sso_state_{state}", str(int(datetime.now(timezone.utc).timestamp()) + 600))
+
+        # Build redirect_uri matching callback endpoint
+        # Use request's base URL / scheme / host or forward headers
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/auth/sso/callback"
+
+        auth_url = build_authorization_url(cfg, redirect_uri=redirect_uri, state=state)
+        return RedirectResponse(url=auth_url, status_code=302)
+
+    @router.get("/auth/sso/callback")
+    async def sso_callback(
+        request: Request,
+        code: Optional[str] = None,
+        state: Optional[str] = None,
+        error: Optional[str] = None,
+        error_description: Optional[str] = None,
+    ):
+        """Handle redirect callback from Keycloak."""
+        if error:
+            logger.warning(f"Keycloak returned error: {error} - {error_description}")
+            return RedirectResponse(
+                url=f"/login?sso_error={urllib.parse.quote(error_description or error)}",
+                status_code=302,
+            )
+
+        if not code or not state:
+            return RedirectResponse(
+                url="/login?sso_error=Missing+code+or+state+parameter",
+                status_code=302,
+            )
+
+        # Validate state
+        state_key = f"sso_state_{state}"
+        state_exp = await db.get_app_setting(state_key)
+        if not state_exp:
+            return RedirectResponse(
+                url="/login?sso_error=Invalid+or+expired+SSO+state",
+                status_code=302,
+            )
+        # Clean up consumed state
+        try:
+            await db.delete_app_setting(state_key)
+        except Exception:
+            pass
+
+        if int(state_exp) < int(datetime.now(timezone.utc).timestamp()):
+            return RedirectResponse(
+                url="/login?sso_error=SSO+session+expired.+Please+try+again.",
+                status_code=302,
+            )
+
+        cfg = await get_sso_config(db, include_secret=True)
+        if not cfg["enabled"]:
+            return RedirectResponse(
+                url="/login?sso_error=SSO+is+not+enabled",
+                status_code=302,
+            )
+
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/auth/sso/callback"
+
+        try:
+            token_data = await exchange_code_for_token(cfg, code, redirect_uri)
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise ValueError("No access_token returned by Keycloak")
+
+            user_info = await get_user_info(cfg, access_token)
+        except Exception as e:
+            logger.error(f"Failed to authenticate with Keycloak: {e}")
+            return RedirectResponse(
+                url=f"/login?sso_error={urllib.parse.quote(str(e))}",
+                status_code=302,
+            )
+
+        sub = user_info.get("sub")
+        if not sub:
+            return RedirectResponse(
+                url="/login?sso_error=No+sub+claim+in+user+info",
+                status_code=302,
+            )
+
+        username = (
+            user_info.get("preferred_username")
+            or user_info.get("username")
+            or user_info.get("email")
+            or f"sso_{sub[:8]}"
+        )
+        email = user_info.get("email")
+
+        # Extract Keycloak groups (Keycloak groups claim can be 'groups' list of strings e.g. ['/devs', '/admins'] or ['devs', 'admins'])
+        raw_groups = user_info.get("groups", [])
+        if isinstance(raw_groups, list):
+            user_groups = set()
+            for g in raw_groups:
+                if isinstance(g, str):
+                    clean_g = g.strip()
+                    user_groups.add(clean_g)
+                    user_groups.add(clean_g.lstrip("/"))
+        else:
+            user_groups = set()
+
+        # Check allowed groups if configured
+        allowed_groups_str = (cfg.get("allowed_groups") or "").strip()
+        if allowed_groups_str:
+            allowed_list = [g.strip().lstrip("/") for g in allowed_groups_str.split(",") if g.strip()]
+            if allowed_list:
+                # User must belong to at least one allowed group
+                matches = any(ag in user_groups for ag in allowed_list)
+                if not matches:
+                    logger.warning(
+                        f"SSO login rejected for '{username}': user groups {user_groups} do not match allowed groups {allowed_list}"
+                    )
+                    return RedirectResponse(
+                        url=f"/login?sso_error={urllib.parse.quote('Access denied: your Keycloak account is not in an authorized group.')}",
+                        status_code=302,
+                    )
+
+        # Check role and admin_group mapping:
+        # Keycloak roles can be in realm_access.roles or roles
+        realm_roles = []
+        if isinstance(user_info.get("realm_access"), dict):
+            realm_roles = user_info["realm_access"].get("roles", [])
+        elif isinstance(user_info.get("roles"), list):
+            realm_roles = user_info["roles"]
+
+        admin_role_name = (cfg.get("admin_role") or "kure-admin").strip()
+        admin_group_name = (cfg.get("admin_group") or "").strip().lstrip("/")
+
+        is_admin = False
+        if admin_role_name and admin_role_name in realm_roles:
+            is_admin = True
+        if admin_group_name and admin_group_name in user_groups:
+            is_admin = True
+
+        assigned_role = "admin" if is_admin else None
+
+        try:
+            user = await db.upsert_sso_user(
+                username=username,
+                email=email,
+                provider="keycloak",
+                sub=sub,
+                role=assigned_role,
+            )
+        except Exception as e:
+            logger.error(f"Failed to upsert SSO user in database: {e}")
+            return RedirectResponse(
+                url=f"/login?sso_error={urllib.parse.quote('Failed to save user account')}",
+                status_code=302,
+            )
+
+        response = RedirectResponse(url="/", status_code=302)
+        await issue_session_cookie(response, request, user)
+        logger.info(f"SSO login successful for user '{user['username']}' (role={user['role']})")
+        return response
+
+    @router.get("/admin/sso/config")
+    async def get_admin_sso_config(user: dict = Depends(require_admin)):
+        """Get Keycloak SSO configuration for admin."""
+        return await get_sso_config(db, include_secret=False)
+
+    @router.post("/admin/sso/config")
+    async def update_admin_sso_config(
+        body: SSOSettingsRequest, user: dict = Depends(require_admin)
+    ):
+        """Update Keycloak SSO configuration."""
+        env_cfg = await get_sso_config(db=None)
+        if env_cfg.get("source") == "env":
+            raise HTTPException(
+                status_code=400,
+                detail="SSO configuration is managed via Helm / environment variables and cannot be modified via UI.",
+            )
+        saved = await save_sso_config(db, body.model_dump())
+        logger.info(f"Admin '{user['username']}' updated Keycloak SSO settings (enabled={saved['enabled']})")
+        return saved
 
     @router.get("/auth/me")
     async def get_me(user: dict = Depends(require_user)):

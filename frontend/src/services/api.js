@@ -144,6 +144,35 @@ export const api = {
     return response.json();
   },
 
+  getSSOConfig: async () => {
+    const response = await fetch(`${API_BASE}/api/auth/sso/config`, {
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
+  getAdminSSOConfig: async () => {
+    const response = await authFetch(`${API_BASE}/api/admin/sso/config`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
+  updateAdminSSOConfig: async (config) => {
+    const response = await authFetch(`${API_BASE}/api/admin/sso/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    if (!response.ok) {
+      const msg = await extractError(response, `HTTP error! status: ${response.status}`);
+      const err = new Error(msg);
+      err.status = response.status;
+      throw err;
+    }
+    return response.json();
+  },
+
   // ============================================================
   // Admin: Users
   // ============================================================

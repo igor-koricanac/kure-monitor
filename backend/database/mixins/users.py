@@ -24,22 +24,26 @@ class UserMixin:
     async def create_user(
         self,
         username: str,
-        password_hash: str,
+        password_hash: Optional[str],
         role: str,
         email: Optional[str] = None,
+        sso_provider: Optional[str] = None,
+        sso_sub: Optional[str] = None,
     ) -> dict:
         """Insert a new user. Returns {id, username, email, role, created_at}."""
         async with self._acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO users (username, password_hash, email, role)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id, username, email, role, created_at, updated_at
+                INSERT INTO users (username, password_hash, email, role, sso_provider, sso_sub)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
                 """,
                 username,
                 password_hash,
                 email,
                 role,
+                sso_provider,
+                sso_sub,
             )
             return _user_row_to_dict(row)
 
@@ -47,7 +51,7 @@ class UserMixin:
         async with self._acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, username, email, role, password_hash, created_at, updated_at
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
                 FROM users WHERE id = $1
                 """,
                 user_id,
@@ -58,18 +62,174 @@ class UserMixin:
         async with self._acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, username, email, role, password_hash, created_at, updated_at
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
                 FROM users WHERE username = $1
                 """,
                 username,
             )
             return _user_row_to_dict(row, include_hash=True) if row else None
 
+    async def get_user_by_email(self, email: str) -> Optional[dict]:
+        async with self._acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
+                FROM users WHERE LOWER(email) = LOWER($1)
+                """,
+                email.strip(),
+            )
+            return _user_row_to_dict(row, include_hash=True) if row else None
+
+    async def get_user_by_sso(self, provider: str, sub: str) -> Optional[dict]:
+        async with self._acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
+                FROM users WHERE sso_provider = $1 AND sso_sub = $2
+                """,
+                provider,
+                sub,
+            )
+            return _user_row_to_dict(row, include_hash=True) if row else None
+
+    async def upsert_sso_user(
+        self,
+        username: str,
+        email: Optional[str],
+        provider: str,
+        sub: str,
+        role: Optional[str] = None,
+    ) -> dict:
+        """Find existing user by sso_provider/sso_sub, or email, or username.
+        
+        If found:
+          - link SSO info if not linked
+          - update role if specified (e.g. keycloak admin role mapped)
+          - update email/updated_at
+        If not found:
+          - create new user with given role (defaults to 'admin' if 0 users exist, else 'member')
+        """
+        async with self._acquire() as conn:
+            # 1. Lookup by SSO identity
+            row = await conn.fetchrow(
+                """
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
+                FROM users WHERE sso_provider = $1 AND sso_sub = $2
+                """,
+                provider,
+                sub,
+            )
+            if row:
+                user_id = row["id"]
+                updates = ["sso_provider = $1", "sso_sub = $2", "updated_at = now()"]
+                args = [provider, sub]
+                if email and email.strip() != (row["email"] or ""):
+                    args.append(email.strip())
+                    updates.append(f"email = ${len(args)}")
+                if role and role != row["role"]:
+                    args.append(role)
+                    updates.append(f"role = ${len(args)}")
+                args.append(user_id)
+                updated_row = await conn.fetchrow(
+                    f"""
+                    UPDATE users SET {', '.join(updates)}
+                    WHERE id = ${len(args)}
+                    RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
+                    """,
+                    *args,
+                )
+                return _user_row_to_dict(updated_row)
+
+            # 2. Lookup by email if email provided
+            if email and email.strip():
+                row = await conn.fetchrow(
+                    """
+                    SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
+                    FROM users WHERE LOWER(email) = LOWER($1)
+                    """,
+                    email.strip(),
+                )
+                if row:
+                    user_id = row["id"]
+                    updates = ["sso_provider = $1", "sso_sub = $2", "updated_at = now()"]
+                    args = [provider, sub]
+                    if role and role != row["role"]:
+                        args.append(role)
+                        updates.append(f"role = ${len(args)}")
+                    args.append(user_id)
+                    updated_row = await conn.fetchrow(
+                        f"""
+                        UPDATE users SET {', '.join(updates)}
+                        WHERE id = ${len(args)}
+                        RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
+                        """,
+                        *args,
+                    )
+                    return _user_row_to_dict(updated_row)
+
+            # 3. Lookup by username
+            row = await conn.fetchrow(
+                """
+                SELECT id, username, email, role, password_hash, sso_provider, sso_sub, created_at, updated_at
+                FROM users WHERE username = $1
+                """,
+                username.strip(),
+            )
+            if row:
+                user_id = row["id"]
+                updates = ["sso_provider = $1", "sso_sub = $2", "updated_at = now()"]
+                args = [provider, sub]
+                if email and email.strip() != (row["email"] or ""):
+                    args.append(email.strip())
+                    updates.append(f"email = ${len(args)}")
+                if role and role != row["role"]:
+                    args.append(role)
+                    updates.append(f"role = ${len(args)}")
+                args.append(user_id)
+                updated_row = await conn.fetchrow(
+                    f"""
+                    UPDATE users SET {', '.join(updates)}
+                    WHERE id = ${len(args)}
+                    RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
+                    """,
+                    *args,
+                )
+                return _user_row_to_dict(updated_row)
+
+            # 4. User does not exist, create new
+            # If total users count is 0, make first user admin
+            total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
+            assigned_role = role or ("admin" if total_users == 0 else "member")
+            if assigned_role not in ("admin", "member"):
+                assigned_role = "member"
+
+            # Check if username collision with another name: if taken, suffix with sso provider
+            existing_name = await conn.fetchval(
+                "SELECT id FROM users WHERE username = $1", username.strip()
+            )
+            final_username = username.strip()
+            if existing_name:
+                final_username = f"{final_username}_{sub[:6]}"
+
+            new_row = await conn.fetchrow(
+                """
+                INSERT INTO users (username, password_hash, email, role, sso_provider, sso_sub)
+                VALUES ($1, NULL, $2, $3, $4, $5)
+                RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
+                """,
+                final_username,
+                email.strip() if email else None,
+                assigned_role,
+                provider,
+                sub,
+            )
+            return _user_row_to_dict(new_row)
+
     async def list_users(self) -> list[dict]:
         async with self._acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, username, email, role, created_at, updated_at
+                SELECT id, username, email, role, sso_provider, sso_sub, created_at, updated_at
                 FROM users ORDER BY created_at ASC
                 """
             )
@@ -82,7 +242,7 @@ class UserMixin:
                 UPDATE users
                 SET role = $1, updated_at = now()
                 WHERE id = $2
-                RETURNING id, username, email, role, created_at, updated_at
+                RETURNING id, username, email, role, sso_provider, sso_sub, created_at, updated_at
                 """,
                 role,
                 user_id,
@@ -203,6 +363,8 @@ def _user_row_to_dict(row, include_hash: bool = False) -> Optional[dict]:
         "username": row["username"],
         "email": row["email"],
         "role": row["role"],
+        "sso_provider": row.get("sso_provider"),
+        "sso_sub": row.get("sso_sub"),
         "created_at": _iso(row["created_at"]),
         "updated_at": _iso(row["updated_at"]),
     }
