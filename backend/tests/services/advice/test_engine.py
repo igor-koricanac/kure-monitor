@@ -292,7 +292,7 @@ async def test_explain_finding_returns_none_when_missing(monkeypatch):
     _patch_detectors(monkeypatch, [_StaticDetector])
     db = _FakeDB()
     topology = _FakeTopology(_empty_ns_ctx())
-    eng = AdviceEngine(db, topology, llm_provider_getter=lambda: None)
+    eng = AdviceEngine(db, topology, llm_provider_getter=lambda target_llm_id=None: None)
 
     result = await eng.explain_finding(999)
     assert result is None
@@ -304,7 +304,7 @@ async def test_explain_finding_invokes_provider_and_persists(monkeypatch):
     db = _FakeDB()
     topology = _FakeTopology(_empty_ns_ctx())
     provider = _FakeProvider(content="## Why this matters\nbecause reasons")
-    eng = AdviceEngine(db, topology, llm_provider_getter=lambda: provider)
+    eng = AdviceEngine(db, topology, llm_provider_getter=lambda target_llm_id=None: provider)
 
     persisted = await eng.scan(namespace="default")
     fid = persisted[0]["id"]
@@ -325,7 +325,7 @@ async def test_explain_finding_idempotent_when_explanation_present(monkeypatch):
     db = _FakeDB()
     topology = _FakeTopology(_empty_ns_ctx())
     provider = _FakeProvider(content="should-not-be-called")
-    eng = AdviceEngine(db, topology, llm_provider_getter=lambda: provider)
+    eng = AdviceEngine(db, topology, llm_provider_getter=lambda target_llm_id=None: provider)
 
     persisted = await eng.scan(namespace="default")
     fid = persisted[0]["id"]
@@ -342,7 +342,7 @@ async def test_explain_finding_no_provider_returns_row_unchanged(monkeypatch):
     _patch_detectors(monkeypatch, [_StaticDetector])
     db = _FakeDB()
     topology = _FakeTopology(_empty_ns_ctx())
-    eng = AdviceEngine(db, topology, llm_provider_getter=lambda: None)
+    eng = AdviceEngine(db, topology, llm_provider_getter=lambda target_llm_id=None: None)
 
     persisted = await eng.scan(namespace="default")
     fid = persisted[0]["id"]

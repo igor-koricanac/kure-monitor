@@ -107,7 +107,7 @@ class TestMirrorRoutes:
         assert data["fixed_manifest"] == "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test"
         assert data["explanation"] == "Changed image tag from latest to 1.0"
         assert data["is_fallback"] is False
-        mock_mirror_service.generate_preview.assert_called_once_with(pod_failure_id=42)
+        mock_mirror_service.generate_preview.assert_called_once_with(pod_failure_id=42, llm_id=None)
 
     @pytest.mark.asyncio
     async def test_preview_mirror_fix_fallback(self, client, mock_mirror_service):

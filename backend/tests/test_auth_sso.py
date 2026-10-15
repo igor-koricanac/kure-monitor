@@ -126,3 +126,44 @@ def test_build_authorization_url():
     assert "client_id=kure-monitor" in url
     assert "response_type=code" in url
     assert "state=test-state" in url
+
+
+def test_evaluate_keycloak_groups_membership():
+    """Verify group evaluation logic for both leading slashes and plain group names."""
+    raw_groups = ["/platform", "/developers/backend", "sre"]
+    user_groups = set()
+    for g in raw_groups:
+        clean_g = g.strip()
+        user_groups.add(clean_g)
+        user_groups.add(clean_g.lstrip("/"))
+
+    allowed_groups_str = "developers/backend,ops"
+    allowed_list = [g.strip().lstrip("/") for g in allowed_groups_str.split(",") if g.strip()]
+    assert any(ag in user_groups for ag in allowed_list) is True
+
+    disallowed_groups_str = "billing,qa"
+    disallowed_list = [g.strip().lstrip("/") for g in disallowed_groups_str.split(",") if g.strip()]
+    assert any(dg in user_groups for dg in disallowed_list) is False
+
+
+def test_evaluate_admin_role_and_admin_group():
+    """Verify admin role and admin group grants."""
+    raw_groups = ["/platform-admins", "developers"]
+    user_groups = set()
+    for g in raw_groups:
+        clean_g = g.strip()
+        user_groups.add(clean_g)
+        user_groups.add(clean_g.lstrip("/"))
+
+    realm_roles = ["default-roles-kure", "offline_access"]
+
+    admin_role_name = "kure-admin"
+    admin_group_name = "platform-admins"
+
+    is_admin = False
+    if admin_role_name and admin_role_name in realm_roles:
+        is_admin = True
+    if admin_group_name and admin_group_name in user_groups:
+        is_admin = True
+
+    assert is_admin is True

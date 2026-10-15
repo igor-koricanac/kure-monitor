@@ -220,6 +220,10 @@ class SolutionEngine:
                 ordered.append((pid, prov))
                 visited.add(pid)
 
+        # 4. Fallback to single self.llm_provider if providers map is empty
+        if not ordered and self.llm_provider:
+            ordered.append((0, self.llm_provider))
+
         return ordered
 
     def update_custom_instructions(self, instructions: Optional[str]) -> None:
