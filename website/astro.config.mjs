@@ -190,6 +190,7 @@ export default defineConfig({
               label: 'Release Notes',
               collapsed: true,
               items: [
+                  { label: '2.6.0', slug: 'release-notes/2-6-0' },
                   { label: '2.5.0', slug: 'release-notes/2-5-0' },
                   { label: '2.4.5', slug: 'release-notes/2-4-5' },
                   { label: '2.4.4', slug: 'release-notes/2-4-4' },

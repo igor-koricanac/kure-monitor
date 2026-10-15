@@ -40,7 +40,7 @@ agent:
 
   image:
     repository: ghcr.io/igor-koricanac/kure-monitor/agent
-    tag: "2.5.0"
+    tag: "2.6.0"
     pullPolicy: IfNotPresent
 
   resources:
@@ -68,7 +68,7 @@ agent:
 securityScanner:
   image:
     repository: ghcr.io/igor-koricanac/kure-monitor/security-scanner
-    tag: "2.5.0"
+    tag: "2.6.0"
     pullPolicy: IfNotPresent
 
   resources:
@@ -98,7 +98,7 @@ backend:
   
   image:
     repository: ghcr.io/igor-koricanac/kure-monitor/backend
-    tag: "2.5.0"
+    tag: "2.6.0"
     pullPolicy: IfNotPresent
   
   service:
@@ -133,7 +133,7 @@ frontend:
 
   image:
     repository: ghcr.io/igor-koricanac/kure-monitor/frontend
-    tag: "2.5.0"
+    tag: "2.6.0"
     pullPolicy: IfNotPresent
 
   service:

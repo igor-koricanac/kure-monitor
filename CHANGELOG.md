@@ -5,7 +5,7 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.0] - 2026-10-15
 
 Headline changes:
 - **Teams & Granular Multi-Tenant RBAC (KAN-93)**: Multi-tenant team access control. Cluster admins can create teams, scope member access to specific namespaces (with live cluster namespace discovery) or all namespaces, assign allowed dashboard tabs (`pod_monitoring`, `security_scanner`, `diagram`, `ai_advice`), and set `read` vs `write` operational permissions.
