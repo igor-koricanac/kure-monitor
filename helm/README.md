@@ -73,11 +73,11 @@ existing users out).
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `agent.pendingGracePeriod` | Seconds before reporting Pending pods as failed | `120` |
-| `agent.image.tag` | Agent image tag | `2.5.0` |
-| `securityScanner.image.tag` | Security scanner image tag | `2.5.0` |
+| `agent.image.tag` | Agent image tag | `2.6.0` |
+| `securityScanner.image.tag` | Security scanner image tag | `2.6.0` |
 | `backend.replicaCount` | Backend replica count | `1` |
-| `backend.image.tag` | Backend image tag | `2.5.0` |
-| `frontend.image.tag` | Frontend image tag | `2.5.0` |
+| `backend.image.tag` | Backend image tag | `2.6.0` |
+| `frontend.image.tag` | Frontend image tag | `2.6.0` |
 
 ### LLM Configuration
 
@@ -148,6 +148,22 @@ ingress:
       hosts:
         - kure.example.com
 ```
+
+### Keycloak SSO Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keycloak.enabled` | Enable Keycloak OIDC SSO | `false` |
+| `keycloak.serverUrl` | Keycloak server URL | `""` |
+| `keycloak.realm` | Keycloak realm name | `""` |
+| `keycloak.clientId` | Client ID configured in Keycloak | `""` |
+| `keycloak.clientSecret` | Client secret (plaintext) | `""` |
+| `keycloak.existingSecret` | Existing Kubernetes Secret name for client secret | `""` |
+| `keycloak.existingSecretKey` | Key within existingSecret containing client secret | `client-secret` |
+| `keycloak.adminRole` | Keycloak realm role mapped to Kure Admin | `kure-admin` |
+| `keycloak.adminGroup` | Keycloak group mapped to Kure Admin | `""` |
+| `keycloak.allowedGroups` | Comma-separated allowed groups (optional access gating) | `""` |
+| `keycloak.scopes` | OIDC scopes requested | `openid profile email` |
 
 ### Prometheus Metrics
 
@@ -237,7 +253,7 @@ helm install kure-monitor kure-monitor/kure \
 
 ```bash
 helm repo update
-helm upgrade kure-monitor kure-monitor/kure --version 2.5.0 -n kure-system
+helm upgrade kure-monitor kure-monitor/kure --version 2.6.0 -n kure-system
 ```
 
 ## Uninstall

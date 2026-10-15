@@ -3,8 +3,8 @@ name: kure
 description: Kubernetes AI observability platform with proactive AI Advice, security scanning, topology diagrams, and pod failure diagnosis.
 type: application
 kubeVersion: ">=1.20.0-0"
-version: 2.5.0
-appVersion: "2.5.0"
+version: 2.6.0
+appVersion: "2.6.0"
 icon: "https://raw.githubusercontent.com/igor-koricanac/kure-monitor/main/docs/images/kure_monitor_logo_white_background.svg"
 keywords:
   - kubernetes
@@ -25,15 +25,13 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/changes: |
     - kind: added
-      description: "Multi-LLM Provider Profiles: Register multiple AI providers simultaneously with automatic failover across the pool."
+      description: "Teams & Granular Multi-Tenant RBAC: Multi-tenant team access control scoped by namespace, tabs, and permissions."
     - kind: added
-      description: "Custom LLM Instructions: Write Markdown instruction documents prepended to every AI prompt for domain-specific guidance."
+      description: "Pod Monitoring Live Pods View: Real-time inventory of all cluster pods alongside failing pods."
     - kind: added
-      description: "GitHub Copilot / Models: Added copilot as a first-class provider type for GitHub Models inference."
-    - kind: changed
-      description: "Encryption Key Preservation: Helm chart uses lookup to preserve encryption Secret across upgrades, preventing InvalidToken errors."
-    - kind: changed
-      description: "Dashboard UI Refresh: Consistent dark mode, multi-LLM management panel, per-finding model attribution, model selector in TroubleshootSection."
+      description: "Interactive Live Log Streaming: Stream real-time container logs with play/pause and download controls."
+    - kind: added
+      description: "Keycloak Enterprise SSO: OpenID Connect single sign-on support via UI and Helm values with group gating."
   artifacthub.io/category: monitoring-logging
   artifacthub.io/displayName: Kure - Kubernetes Failure Diagnosis
   artifacthub.io/license: Apache-2.0
@@ -53,7 +51,7 @@ annotations:
     helm repo add kure-monitor https://kuremonitor.com/
 
     # Install Kure Monitor
-    helm install kure-monitor kure-monitor/kure --version 2.5.0 \
+    helm install kure-monitor kure-monitor/kure --version 2.6.0 \
       --create-namespace --namespace kure-system \
       --set postgresql.password="$(openssl rand -hex 24)"
 

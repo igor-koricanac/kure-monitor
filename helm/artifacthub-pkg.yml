@@ -1,22 +1,22 @@
-version: 2.5.0
+version: 2.6.0
 name: kure
 category: monitoring-logging
 displayName: Kure - Kubernetes Failure Diagnosis
-createdAt: 2026-07-23T00:00:00Z
+createdAt: 2026-10-15T00:00:00Z
 description: |
   Kubernetes AI observability platform. Instantly detect and debug pod failures (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), proactively scan your entire cluster with the AI Advice engine, visualize workloads with an interactive topology Diagram, and audit your configurations with a built-in Security Scanner.
 license: Apache-2.0
 homeURL: https://kuremonitor.com
-appVersion: "2.5.0"
+appVersion: "2.6.0"
 containersImages:
   - name: agent
-    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.5.0
+    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.6.0
   - name: backend
-    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.5.0
+    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.6.0
   - name: frontend
-    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.5.0
+    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.6.0
   - name: security-scanner
-    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.5.0
+    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.6.0
 operator: false
 deprecated: false
 prerelease: false
@@ -42,19 +42,17 @@ provider:
   name: igor-koricanac
 changes:
   - kind: added
-    description: "Multi-LLM Provider Profiles: Register multiple AI providers simultaneously with automatic failover across the pool."
+    description: "Teams & Granular Multi-Tenant RBAC: Multi-tenant team access control scoped by namespace, tabs, and permissions."
   - kind: added
-    description: "Custom LLM Instructions: Write Markdown instruction documents prepended to every AI prompt for domain-specific guidance."
+    description: "Pod Monitoring Live Pods View: Real-time inventory of all cluster pods alongside failing pods."
   - kind: added
-    description: "GitHub Copilot / Models: Added copilot as a first-class provider type for GitHub Models inference."
-  - kind: changed
-    description: "Encryption Key Preservation: Helm chart uses lookup to preserve encryption Secret across upgrades, preventing InvalidToken errors."
-  - kind: changed
-    description: "Dashboard UI Refresh: Consistent dark mode, multi-LLM management panel, per-finding model attribution, model selector in TroubleshootSection."
+    description: "Interactive Live Log Streaming: Stream real-time container logs with play/pause and download controls."
+  - kind: added
+    description: "Keycloak Enterprise SSO: OpenID Connect single sign-on support via UI and Helm values with group gating."
 install: |
   helm repo add kure-monitor https://kuremonitor.com/
 
-  helm install kure-monitor kure-monitor/kure --version 2.5.0 \
+  helm install kure-monitor kure-monitor/kure --version 2.6.0 \
     --create-namespace --namespace kure-system \
     --set postgresql.password="$(openssl rand -hex 24)"
 
