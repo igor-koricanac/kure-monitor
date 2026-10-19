@@ -13,7 +13,7 @@ spec:
     backend:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/backend
-        tag: "9fed9e9"
+        tag: "7f47839"
         pullPolicy: IfNotPresent
     frontend:
       image:
