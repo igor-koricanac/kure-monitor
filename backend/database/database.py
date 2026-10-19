@@ -66,9 +66,22 @@ class Database:
         return await self._db.save_security_finding(finding)
 
     async def get_security_findings(
-        self, include_dismissed=False, dismissed_only=False
+        self,
+        include_dismissed: bool = False,
+        dismissed_only: bool = False,
+        namespace=None,
+        limit=None,
+        offset: int = 0,
+        include_manifest: bool = False,
     ):
-        return await self._db.get_security_findings(include_dismissed, dismissed_only)
+        return await self._db.get_security_findings(
+            include_dismissed=include_dismissed,
+            dismissed_only=dismissed_only,
+            namespace=namespace,
+            limit=limit,
+            offset=offset,
+            include_manifest=include_manifest,
+        )
 
     async def get_security_finding_by_id(self, finding_id):
         return await self._db.get_security_finding_by_id(finding_id)
