@@ -38,6 +38,8 @@ The agent runs as a DaemonSet (one pod per node) and watches the Kubernetes API 
 | `agent.pendingGracePeriod` | Seconds before pending pods are flagged | `120` |
 | `agent.image.repository` | Agent image repository | `ghcr.io/igor-koricanac/kure-monitor/agent` |
 | `agent.image.tag` | Agent image tag | `2.6.0` |
+| `agent.initImage.repository` | Agent init container image override | `""` (falls back to `global.initImage`) |
+| `agent.initImage.tag` | Agent init container tag override | `""` |
 | `agent.resources.requests.cpu` | CPU request | `100m` |
 | `agent.resources.requests.memory` | Memory request | `128Mi` |
 | `agent.resources.limits.cpu` | CPU limit | `500m` |
@@ -50,6 +52,8 @@ Deployed only when `features.securityScan=true`.
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `securityScanner.image.tag` | Scanner image tag | `2.6.0` |
+| `securityScanner.initImage.repository` | Scanner init container image override | `""` (falls back to `global.initImage`) |
+| `securityScanner.initImage.tag` | Scanner init container tag override | `""` |
 | `securityScanner.resources.requests.cpu` | CPU request | `100m` |
 | `securityScanner.resources.requests.memory` | Memory request | `128Mi` |
 

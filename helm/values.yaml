@@ -7,6 +7,10 @@ fullnameOverride: ""
 global:
   imageRegistry: ""
   imagePullSecrets: []
+  initImage:
+    repository: curlimages/curl
+    tag: "8.15.0"
+    pullPolicy: IfNotPresent
 
 # Feature toggles. All features are enabled by default. Set to false to
 # disable a feature: the matching tab is hidden in the dashboard, and any
@@ -43,6 +47,11 @@ agent:
     tag: "2.6.0"
     pullPolicy: IfNotPresent
 
+  initImage:
+    repository: ""  # Overrides global.initImage.repository when set
+    tag: ""         # Overrides global.initImage.tag when set
+    pullPolicy: ""
+
   resources:
     requests:
       cpu: 100m
@@ -70,6 +79,11 @@ securityScanner:
     repository: ghcr.io/igor-koricanac/kure-monitor/security-scanner
     tag: "2.6.0"
     pullPolicy: IfNotPresent
+
+  initImage:
+    repository: ""  # Overrides global.initImage.repository when set
+    tag: ""         # Overrides global.initImage.tag when set
+    pullPolicy: ""
 
   resources:
     requests:

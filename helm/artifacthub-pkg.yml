@@ -49,6 +49,8 @@ changes:
     description: "Interactive Live Log Streaming: Stream real-time container logs with play/pause and download controls."
   - kind: added
     description: "Keycloak Enterprise SSO: OpenID Connect single sign-on support via UI and Helm values with group gating."
+  - kind: changed
+    description: "Configurable Init Containers: Support custom init container images via global.initImage, agent.initImage, and securityScanner.initImage."
 install: |
   helm repo add kure-monitor https://kuremonitor.com/
 

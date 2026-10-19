@@ -27,8 +27,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
       - name: wait-for-backend
-        image: curlimages/curl:8.15.0
-        imagePullPolicy: IfNotPresent
+        {{- $initRepo := and .Values.securityScanner.initImage .Values.securityScanner.initImage.repository | default (and .Values.global.initImage .Values.global.initImage.repository) | default "curlimages/curl" }}
+        {{- $initTag := and .Values.securityScanner.initImage .Values.securityScanner.initImage.tag | default (and .Values.global.initImage .Values.global.initImage.tag) | default "8.15.0" }}
+        image: "{{ .Values.global.imageRegistry }}{{ $initRepo }}:{{ $initTag }}"
+        imagePullPolicy: {{ and .Values.securityScanner.initImage .Values.securityScanner.initImage.pullPolicy | default (and .Values.global.initImage .Values.global.initImage.pullPolicy) | default "IfNotPresent" }}
         command:
           - /bin/sh
           - -c
