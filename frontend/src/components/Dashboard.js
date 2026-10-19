@@ -239,26 +239,18 @@ const Dashboard = () => {
         );
       });
     } else if (message.type === 'pod_status_change') {
-      // Move pod between lists based on new status
       const pod = message.data;
       const newStatus = pod.status;
-      // Remove from all lists first
+      // Remove from active list
       setPods(prev => prev.filter(p => p.id !== pod.id));
-      setPodHistory(prev => prev.filter(p => p.id !== pod.id));
-      setIgnoredPods(prev => prev.filter(p => p.id !== pod.id));
-      // Add to appropriate list
+      // Re-add if still active (new or investigating)
       if (newStatus === 'new' || newStatus === 'investigating') {
         setPods(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
-      } else if (newStatus === 'resolved') {
-        setPodHistory(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
-      } else if (newStatus === 'ignored') {
-        setIgnoredPods(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
       }
     } else if (message.type === 'pod_record_deleted') {
-      // Remove permanently deleted pod record from all lists
+      // Pod record deleted
       const deletedId = message.data.id;
-      setPodHistory(prev => prev.filter(p => p.id !== deletedId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== deletedId));
+      setPods(prev => prev.filter(p => p.id !== deletedId));
     }
   }, [showSecurityBanner]);
 
