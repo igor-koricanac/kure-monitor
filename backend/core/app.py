@@ -18,7 +18,7 @@ from services.advice.detector_settings import DetectorSettingsService
 from services.advice.hubble import StubHubbleClient
 from api.routes import create_api_router
 from api.auth import get_service_token, get_session_secret
-from api.middleware import configure_cors, configure_exception_handlers
+from api.middleware import configure_cors, configure_gzip, configure_exception_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,7 @@ def create_app() -> FastAPI:
 
     # Configure middleware and exception handlers
     configure_cors(app)
+    configure_gzip(app)
     configure_exception_handlers(app)
 
     # Health check endpoint (outside of API router for compatibility)

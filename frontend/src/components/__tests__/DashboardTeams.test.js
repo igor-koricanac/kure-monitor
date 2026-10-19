@@ -63,7 +63,7 @@ describe('Dashboard Team Permissions and Empty State', () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText('Pod Monitoring')).toBeInTheDocument();
+    expect(await screen.findByText('Pod Monitoring')).toBeInTheDocument();
     expect(screen.queryByText('Security Scan')).not.toBeInTheDocument();
     expect(screen.queryByText('Diagram')).not.toBeInTheDocument();
     expect(screen.queryByText('Advice')).not.toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('Dashboard Team Permissions and Empty State', () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText('Pod Monitoring')).toBeInTheDocument();
+    expect(await screen.findByText('Pod Monitoring')).toBeInTheDocument();
     expect(screen.getByText('Security Scan')).toBeInTheDocument();
     expect(screen.getByText('Advice')).toBeInTheDocument();
     expect(screen.getByText('Diagram')).toBeInTheDocument();

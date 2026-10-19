@@ -48,19 +48,50 @@ class SecurityFindingMixin:
                 )
                 return result['id'], True
 
-    async def get_security_findings(self, include_dismissed: bool = False, dismissed_only: bool = False) -> List[SecurityFindingResponse]:
-        """Get all security findings from database"""
+    async def get_security_findings(
+        self,
+        include_dismissed: bool = False,
+        dismissed_only: bool = False,
+        namespace: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        include_manifest: bool = False,
+    ) -> List[SecurityFindingResponse]:
+        """Get security findings from database.
+        
+        By default excludes heavy YAML manifest text to prevent multi-megabyte payloads.
+        Individual manifests are fetched on-demand via get_security_finding_by_id().
+        """
         async with self._acquire() as conn:
-            query = "SELECT * FROM security_findings WHERE 1=1"
+            columns = (
+                "id, resource_type, resource_name, namespace, severity, category, "
+                "title, description, remediation, timestamp, dismissed, manifest"
+                if include_manifest
+                else "id, resource_type, resource_name, namespace, severity, category, "
+                     "title, description, remediation, timestamp, dismissed"
+            )
+            query = f"SELECT {columns} FROM security_findings WHERE 1=1"
+            params = []
 
             if dismissed_only:
                 query += " AND dismissed = TRUE"
             elif not include_dismissed:
                 query += " AND dismissed = FALSE"
 
+            if namespace:
+                params.append(namespace)
+                query += f" AND namespace = ${len(params)}"
+
             query += " ORDER BY created_at DESC"
 
-            rows = await conn.fetch(query)
+            if limit is not None and limit > 0:
+                params.append(limit)
+                query += f" LIMIT ${len(params)}"
+                if offset > 0:
+                    params.append(offset)
+                    query += f" OFFSET ${len(params)}"
+
+            rows = await conn.fetch(query, *params)
 
             findings = []
             for row in rows:
@@ -78,7 +109,7 @@ class SecurityFindingMixin:
                     remediation=row['remediation'],
                     timestamp=timestamp,
                     dismissed=bool(row['dismissed']),
-                    manifest=row.get('manifest', '')
+                    manifest=row.get('manifest', '') if include_manifest else ""
                 )
                 findings.append(finding)
 

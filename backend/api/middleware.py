@@ -1,6 +1,7 @@
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 import logging
 import traceback
 
@@ -15,6 +16,10 @@ def configure_cors(app):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+def configure_gzip(app, minimum_size: int = 1000):
+    """Configure GZip response compression for payloads >= minimum_size bytes"""
+    app.add_middleware(GZipMiddleware, minimum_size=minimum_size)
 
 def configure_exception_handlers(app):
     """Configure global exception handlers"""

@@ -151,16 +151,38 @@ def create_security_router(deps: RouterDeps) -> APIRouter:
     websocket_manager = deps.websocket_manager
 
     @router.get("/security/findings", response_model=list[SecurityFindingResponse])
-    async def get_security_findings(request: Request):
+    async def get_security_findings(
+        request: Request,
+        namespace: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        include_dismissed: bool = False,
+        dismissed_only: bool = False,
+    ):
         """Get all security findings from database, filtered by user team namespaces if restricted."""
         try:
-            findings = await db.get_security_findings()
+            # If user has team restrictions, enforce them
             user = getattr(request.state, "user", None)
+            allowed_ns: Optional[set] = None
             if user and user.get("role") != "admin":
                 perms = await db.get_user_effective_permissions(user)
                 if not perms.get("all_namespaces"):
                     allowed_ns = set(perms.get("namespaces", []))
-                    findings = [f for f in findings if f.namespace in allowed_ns]
+                    if namespace and namespace not in allowed_ns:
+                        return []
+
+            findings = await db.get_security_findings(
+                include_dismissed=include_dismissed,
+                dismissed_only=dismissed_only,
+                namespace=namespace,
+                limit=limit,
+                offset=offset,
+                include_manifest=False,
+            )
+
+            if allowed_ns is not None:
+                findings = [f for f in findings if f.namespace in allowed_ns]
+
             return findings
         except Exception as e:
             logger.error(f"Error getting security findings: {e}")

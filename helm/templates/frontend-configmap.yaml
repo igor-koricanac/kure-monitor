@@ -9,7 +9,20 @@ data:
   default.conf: |
     server {
         listen 8080;
-        
+
+        # Gzip compression for static assets and API JSON responses
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_min_length 1000;
+        gzip_types application/json text/plain text/css application/javascript application/x-javascript text/xml application/xml application/xml+rss text/javascript;
+
+        # Proxy buffer settings to prevent disk buffering warnings for API responses
+        proxy_buffers 16 64k;
+        proxy_buffer_size 128k;
+        proxy_busy_buffers_size 128k;
+
         # Serve static files
         location / {
             root /usr/share/nginx/html;
@@ -20,7 +33,7 @@ data:
         # Proxy API requests to backend
         location /api/ {
             proxy_pass http://{{ include "kure.fullname" . }}-backend:{{ .Values.backend.service.port }};
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;

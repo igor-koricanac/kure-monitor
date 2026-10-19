@@ -461,8 +461,14 @@ export const api = {
   },
 
   // Security findings API
-  getSecurityFindings: async () => {
-    const response = await authFetch(`${API_BASE}/api/security/findings`);
+  getSecurityFindings: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.namespace) query.set('namespace', params.namespace);
+    if (params.limit) query.set('limit', params.limit);
+    if (params.offset) query.set('offset', params.offset);
+    const qs = query.toString();
+    const url = qs ? `${API_BASE}/api/security/findings?${qs}` : `${API_BASE}/api/security/findings`;
+    const response = await authFetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
   },

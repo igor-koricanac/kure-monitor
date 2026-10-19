@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, RefreshCw, Terminal, Search, CheckCircle, EyeOff, RotateCcw, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
+import { FileText, RefreshCw, Terminal, CheckCircle, RotateCcw, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
 import SolutionMarkdown from './SolutionMarkdown';
 import TroubleshootSection from './TroubleshootSection';
 import { api } from '../services/api';
@@ -347,46 +347,6 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
       {/* Workflow Actions */}
       {onStatusChange && (
         <div className="flex items-center flex-wrap gap-2">
-          {/* New status: Acknowledge + Ignore */}
-          {(pod.status === 'new' || !pod.status) && (
-            <>
-              <button
-                onClick={() => handleStatusAction('investigating')}
-                disabled={isUpdatingStatus}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-blue-300 bg-blue-900/40 border border-blue-700 hover:bg-blue-900/60' : 'text-blue-700 bg-blue-100 border border-blue-300 hover:bg-blue-200'}`}
-              >
-                <Search className="w-3.5 h-3.5 mr-1" />
-                Acknowledge
-              </button>
-              <button
-                onClick={() => handleStatusAction('ignored')}
-                disabled={isUpdatingStatus}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-gray-300 bg-gray-700 border border-gray-600 hover:bg-gray-600' : 'text-gray-600 bg-gray-100 border border-gray-300 hover:bg-gray-200'}`}
-              >
-                <EyeOff className="w-3.5 h-3.5 mr-1" />
-                Ignore
-              </button>
-            </>
-          )}
-
-          {/* Investigating status: Ignore only (resolve is automatic) */}
-          {pod.status === 'investigating' && (
-            <>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${isDark ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-300'}`}>
-                <Clock className="w-3 h-3 mr-1" />
-                Investigating {pod.acknowledged_by ? `(by ${pod.acknowledged_by})` : ''} — will auto-resolve when pod recovers
-              </span>
-              <button
-                onClick={() => handleStatusAction('ignored')}
-                disabled={isUpdatingStatus}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-gray-300 bg-gray-700 border border-gray-600 hover:bg-gray-600' : 'text-gray-600 bg-gray-100 border border-gray-300 hover:bg-gray-200'}`}
-              >
-                <EyeOff className="w-3.5 h-3.5 mr-1" />
-                Ignore
-              </button>
-            </>
-          )}
-
           {/* Resolved status: show resolution info + delete */}
           {pod.status === 'resolved' && (
             <div className={`flex items-center text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>

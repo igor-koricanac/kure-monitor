@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, Clock, EyeOff, RefreshCw, LogOut, Network, Lightbulb, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, RefreshCw, LogOut, Network, Lightbulb, Users } from 'lucide-react';
 import PodTable from './PodTable';
 import SecurityTable from './SecurityTable';
 import AdminPanel from './AdminPanel';
@@ -48,8 +48,6 @@ const Dashboard = () => {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   // Pod sub-tab state
   const [podSubTab, setPodSubTab] = useState('active');
-  const [podHistory, setPodHistory] = useState([]);
-  const [ignoredPods, setIgnoredPods] = useState([]);
   // Advice WS event forwarding — each new advice_* WS message increments
   // `seq` so AdvicePanel can react via useEffect even when payloads repeat.
   const [adviceEvent, setAdviceEvent] = useState(null);
@@ -281,65 +279,21 @@ const Dashboard = () => {
         : pod
     );
     setPods(applyUpdate);
-    setPodHistory(applyUpdate);
-    setIgnoredPods(applyUpdate);
   };
 
-  // Handle permanent deletion of a pod record (history/ignored)
-  const handleDeletePodRecord = async (podId) => {
-    try {
-      await api.deletePodRecord(podId);
-      setPodHistory(prev => prev.filter(p => p.id !== podId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== podId));
-    } catch (err) {
-      console.error('Failed to delete pod record:', err);
-    }
-  };
-
-  // Handle pod status change (acknowledge, resolve, ignore, restore)
+  // Handle pod status change
   const handleStatusChange = async (podId, newStatus) => {
     try {
       const updatedPod = await api.updatePodStatus(podId, newStatus);
       // Remove from current list
       setPods(prev => prev.filter(p => p.id !== podId));
-      setPodHistory(prev => prev.filter(p => p.id !== podId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== podId));
-      // Add to appropriate list
       if (newStatus === 'new' || newStatus === 'investigating') {
         setPods(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      } else if (newStatus === 'resolved') {
-        setPodHistory(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      } else if (newStatus === 'ignored') {
-        setIgnoredPods(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
       }
     } catch (err) {
       console.error('Failed to update pod status:', err);
     }
   };
-
-  // Load history/ignored pods on sub-tab change
-  const loadPodHistory = useCallback(async () => {
-    try {
-      const history = await api.getPodHistory();
-      setPodHistory(history);
-    } catch (err) {
-      console.error('Failed to load pod history:', err);
-    }
-  }, []);
-
-  const loadIgnoredPods = useCallback(async () => {
-    try {
-      const ignored = await api.getIgnoredPods();
-      setIgnoredPods(ignored);
-    } catch (err) {
-      console.error('Failed to load ignored pods:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (podSubTab === 'history') loadPodHistory();
-    else if (podSubTab === 'ignored') loadIgnoredPods();
-  }, [podSubTab, loadPodHistory, loadIgnoredPods]);
 
   const { connected } = useWebSocket(handleWebSocketMessage);
 
@@ -347,14 +301,6 @@ const Dashboard = () => {
   const filteredPods = podNamespaceFilter.trim() === ''
     ? pods
     : pods.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
-
-  const filteredHistory = podNamespaceFilter.trim() === ''
-    ? podHistory
-    : podHistory.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
-
-  const filteredIgnored = podNamespaceFilter.trim() === ''
-    ? ignoredPods
-    : ignoredPods.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
 
   // Severity order for sorting (Critical > High > Medium > Low)
   const severityOrder = { 'critical': 1, 'high': 2, 'medium': 3, 'low': 4 };
@@ -449,25 +395,19 @@ const Dashboard = () => {
       try {
         if (cancelled) return;
         setLoading(true);
-        const [activePods, findings, config, history, ignored] = await Promise.all([
+        const [activePods, findings, config] = await Promise.all([
           api.getFailedPods(),
           api.getSecurityFindings(),
-          api.getConfig(),
-          api.getPodHistory().catch(() => []),
-          api.getIgnoredPods().catch(() => [])
+          api.getConfig()
         ]);
         if (cancelled) return;
-        setPods(activePods);
+        setPods(Array.isArray(activePods) ? activePods : []);
         if (cancelled) return;
-        setSecurityFindings(findings);
+        setSecurityFindings(Array.isArray(findings) ? findings : (findings?.findings || []));
         if (cancelled) return;
-        setAiEnabled(config.ai_enabled || false);
+        setAiEnabled(config?.ai_enabled || false);
         if (cancelled) return;
-        if (config.features) setFeatures(prev => ({ ...prev, ...config.features }));
-        if (cancelled) return;
-        setPodHistory(history);
-        if (cancelled) return;
-        setIgnoredPods(ignored);
+        if (config?.features) setFeatures(prev => ({ ...prev, ...config.features }));
         if (cancelled) return;
         setError(null);
       } catch (err) {
@@ -976,38 +916,6 @@ const Dashboard = () => {
                   <Server className="w-4 h-4" />
                   <span>Live Pods</span>
                 </button>
-                <button
-                  onClick={() => setPodSubTab('history')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
-                    podSubTab === 'history'
-                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
-                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>History</span>
-                  {podHistory.length > 0 && (
-                    <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                      {podHistory.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setPodSubTab('ignored')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
-                    podSubTab === 'ignored'
-                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
-                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <EyeOff className="w-4 h-4" />
-                  <span>Ignored</span>
-                  {ignoredPods.length > 0 && (
-                    <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700'}`}>
-                      {ignoredPods.length}
-                    </span>
-                  )}
-                </button>
               </div>
 
               {/* Active sub-tab */}
@@ -1030,44 +938,6 @@ const Dashboard = () => {
                     </div>
                   ) : (
                     <PodTable pods={filteredPods} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} isDark={isDark} aiEnabled={aiEnabled} viewMode="active" canWrite={canWrite} />
-                  )}
-                </>
-              )}
-
-              {/* History sub-tab */}
-              {podSubTab === 'history' && (
-                <>
-                  {filteredHistory.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Clock className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-                      <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                        No Resolved Pods
-                      </h3>
-                      <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                        Resolved pod failures will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <PodTable pods={filteredHistory} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} onDeleteRecord={handleDeletePodRecord} isDark={isDark} aiEnabled={aiEnabled} viewMode="history" canWrite={canWrite} />
-                  )}
-                </>
-              )}
-
-              {/* Ignored sub-tab */}
-              {podSubTab === 'ignored' && (
-                <>
-                  {filteredIgnored.length === 0 ? (
-                    <div className="text-center py-12">
-                      <EyeOff className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-                      <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                        No Ignored Pods
-                      </h3>
-                      <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                        Ignored pod failures will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <PodTable pods={filteredIgnored} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} onDeleteRecord={handleDeletePodRecord} isDark={isDark} aiEnabled={aiEnabled} viewMode="ignored" canWrite={canWrite} />
                   )}
                 </>
               )}
