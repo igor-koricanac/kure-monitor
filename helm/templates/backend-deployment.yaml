@@ -120,6 +120,8 @@ spec:
           value: {{ .Values.keycloak.allowedGroups | default "" | quote }}
         - name: KEYCLOAK_SCOPES
           value: {{ .Values.keycloak.scopes | default "openid profile email" | quote }}
+        - name: KEYCLOAK_INSECURE_SKIP_TLS_VERIFY
+          value: {{ .Values.keycloak.insecureSkipTlsVerify | default false | quote }}
         {{- end }}
         volumeMounts:
         - name: tmp

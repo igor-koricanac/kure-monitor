@@ -104,16 +104,16 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
     }
   };
 
-  // Load logs when modal opens or settings change
+  // Load logs when modal opens or container/filter settings change
   useEffect(() => {
     if (isOpen && pod && selectedContainer) {
       if (pod.autoStream) {
         startStreaming();
-      } else if (!isStreaming) {
+      } else {
         fetchLogs();
       }
     }
-  }, [isOpen, pod, selectedContainer, tailLines, showPrevious, fetchLogs, isStreaming, startStreaming]);
+  }, [isOpen, pod?.namespace, podName, selectedContainer, tailLines, showPrevious]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clean up streaming and reset state when modal closes
   useEffect(() => {

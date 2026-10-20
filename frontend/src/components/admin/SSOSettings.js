@@ -13,6 +13,7 @@ const SSOSettings = ({ isDark, onError, onSuccess }) => {
     admin_group: '',
     allowed_groups: '',
     scopes: 'openid profile email',
+    insecure_skip_tls_verify: false,
     source: 'none',
   });
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,7 @@ const SSOSettings = ({ isDark, onError, onSuccess }) => {
             admin_group: data.admin_group || '',
             allowed_groups: data.allowed_groups || '',
             scopes: data.scopes || 'openid profile email',
+            insecure_skip_tls_verify: !!data.insecure_skip_tls_verify,
             source: data.source || 'none',
           });
         }
@@ -72,6 +74,7 @@ const SSOSettings = ({ isDark, onError, onSuccess }) => {
         admin_group: config.admin_group,
         allowed_groups: config.allowed_groups,
         scopes: config.scopes,
+        insecure_skip_tls_verify: config.insecure_skip_tls_verify,
       });
       setConfig((prev) => ({
         ...prev,
@@ -323,6 +326,32 @@ const SSOSettings = ({ isDark, onError, onSuccess }) => {
                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
               } ${isEnvManaged ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
+          </div>
+
+          {/* Insecure Skip TLS Verify */}
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <label className={`text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                Skip TLS Verification
+              </label>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                Disable SSL certificate validation when communicating with Keycloak (useful for internal CAs or self-signed certs).
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isEnvManaged}
+              onClick={() => handleChange('insecure_skip_tls_verify', !config.insecure_skip_tls_verify)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                config.insecure_skip_tls_verify ? 'bg-amber-600' : isDark ? 'bg-gray-600' : 'bg-gray-200'
+              } ${isEnvManaged ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  config.insecure_skip_tls_verify ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
 

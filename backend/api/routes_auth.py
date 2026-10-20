@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -42,6 +43,7 @@ class SSOSettingsRequest(BaseModel):
     admin_group: Optional[str] = ""
     allowed_groups: Optional[str] = ""
     scopes: Optional[str] = "openid profile email"
+    insecure_skip_tls_verify: bool = False
 
 
 class SetupRequest(BaseModel):

@@ -267,6 +267,7 @@ keycloak:
   adminGroup: ""      # Keycloak group mapped to Kure Monitor admin (optional)
   allowedGroups: ""   # Comma-separated list of allowed Keycloak groups (optional, e.g. "developers,platform-team")
   scopes: "openid profile email"
+  insecureSkipTlsVerify: false  # Set to true to disable TLS cert validation (useful for internal CAs or self-signed certs)
 
 # Prometheus metrics configuration
 prometheus:

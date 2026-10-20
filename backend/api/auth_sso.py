@@ -63,11 +63,13 @@ async def get_sso_config(db, include_secret: bool = False) -> Dict[str, Any]:
     env_admin_group = os.environ.get("KEYCLOAK_ADMIN_GROUP")
     env_allowed_groups = os.environ.get("KEYCLOAK_ALLOWED_GROUPS")
     env_scopes = os.environ.get("KEYCLOAK_SCOPES")
+    env_insecure_skip_verify = os.environ.get("KEYCLOAK_INSECURE_SKIP_TLS_VERIFY")
 
     # If any env var is set, env config is active
     if env_server_url or env_enabled_str is not None:
         is_enabled = (env_enabled_str or "").lower() in ("true", "1", "yes")
         secret = env_client_secret or ""
+        insecure = (env_insecure_skip_verify or "").lower() in ("true", "1", "yes")
         return {
             "enabled": is_enabled,
             "server_url": (env_server_url or "").rstrip("/"),
@@ -78,6 +80,7 @@ async def get_sso_config(db, include_secret: bool = False) -> Dict[str, Any]:
             "admin_group": env_admin_group or "",
             "allowed_groups": env_allowed_groups or "",
             "scopes": env_scopes or DEFAULT_SCOPES,
+            "insecure_skip_tls_verify": insecure,
             "source": "env",
         }
 
@@ -98,6 +101,7 @@ async def get_sso_config(db, include_secret: bool = False) -> Dict[str, Any]:
                     "admin_group": cfg.get("admin_group") or "",
                     "allowed_groups": cfg.get("allowed_groups") or "",
                     "scopes": cfg.get("scopes") or DEFAULT_SCOPES,
+                    "insecure_skip_tls_verify": bool(cfg.get("insecure_skip_tls_verify", False)),
                     "source": "db",
                 }
         except Exception as e:
@@ -113,6 +117,7 @@ async def get_sso_config(db, include_secret: bool = False) -> Dict[str, Any]:
         "admin_group": "",
         "allowed_groups": "",
         "scopes": DEFAULT_SCOPES,
+        "insecure_skip_tls_verify": False,
         "source": "none",
     }
 
@@ -144,6 +149,7 @@ async def save_sso_config(db, config: Dict[str, Any]) -> Dict[str, Any]:
         "admin_group": (config.get("admin_group", "") or "").strip(),
         "allowed_groups": (config.get("allowed_groups", "") or "").strip(),
         "scopes": (config.get("scopes", "") or "").strip() or DEFAULT_SCOPES,
+        "insecure_skip_tls_verify": bool(config.get("insecure_skip_tls_verify", False)),
     }
 
     await db.set_app_setting(KEYCLOAK_CONFIG_SETTING_KEY, json.dumps(new_cfg))
@@ -194,8 +200,10 @@ async def exchange_code_for_token(
         "redirect_uri": redirect_uri,
     }
 
+    skip_verify = bool(config.get("insecure_skip_tls_verify"))
+    connector = aiohttp.TCPConnector(ssl=False) if skip_verify else None
     timeout = aiohttp.ClientTimeout(total=15)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         async with session.post(endpoints["token_endpoint"], data=data) as resp:
             if resp.status != 200:
                 body = await resp.text()
@@ -211,8 +219,10 @@ async def get_user_info(
     endpoints = get_keycloak_endpoints(config["server_url"], config["realm"])
     headers = {"Authorization": f"Bearer {access_token}"}
 
+    skip_verify = bool(config.get("insecure_skip_tls_verify"))
+    connector = aiohttp.TCPConnector(ssl=False) if skip_verify else None
     timeout = aiohttp.ClientTimeout(total=15)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         async with session.get(endpoints["userinfo_endpoint"], headers=headers) as resp:
             if resp.status != 200:
                 body = await resp.text()

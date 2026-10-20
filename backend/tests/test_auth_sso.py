@@ -167,3 +167,33 @@ def test_evaluate_admin_role_and_admin_group():
         is_admin = True
 
     assert is_admin is True
+
+
+@pytest.mark.asyncio
+async def test_sso_config_insecure_skip_tls_verify(monkeypatch):
+    """Test insecure_skip_tls_verify via env and DB."""
+    # Test env var
+    monkeypatch.setenv("KEYCLOAK_ENABLED", "true")
+    monkeypatch.setenv("KEYCLOAK_SERVER_URL", "https://keycloak.company.org")
+    monkeypatch.setenv("KEYCLOAK_INSECURE_SKIP_TLS_VERIFY", "true")
+
+    db = FakeDB()
+    cfg = await get_sso_config(db)
+    assert cfg["insecure_skip_tls_verify"] is True
+
+    # Test DB setting
+    monkeypatch.delenv("KEYCLOAK_ENABLED", raising=False)
+    monkeypatch.delenv("KEYCLOAK_SERVER_URL", raising=False)
+    monkeypatch.delenv("KEYCLOAK_INSECURE_SKIP_TLS_VERIFY", raising=False)
+
+    await save_sso_config(db, {
+        "enabled": True,
+        "server_url": "https://keycloak.local",
+        "realm": "master",
+        "client_id": "kure-app",
+        "insecure_skip_tls_verify": True,
+    })
+
+    db_cfg = await get_sso_config(db)
+    assert db_cfg["insecure_skip_tls_verify"] is True
+
