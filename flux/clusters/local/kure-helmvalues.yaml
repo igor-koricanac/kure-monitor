@@ -18,7 +18,7 @@ spec:
     frontend:
       image:
         repository: ghcr.io/igor-koricanac/kure-monitor/frontend
-        tag: "4f650b8"
+        tag: "3874c71"
         pullPolicy: IfNotPresent
     agent:
       image:
