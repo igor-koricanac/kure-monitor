@@ -3,7 +3,7 @@ import { X, Loader2, AlertTriangle, Terminal, RotateCcw, Download, ArrowDown, Pl
 import { api } from '../services/api';
 import useModalA11y from '../hooks/useModalA11y';
 
-const LINE_OPTIONS = [50, 100, 500, 1000, 2000];
+const DEFAULT_TAIL_LINES = 100;
 
 const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
   const [logs, setLogs] = useState('');
@@ -11,7 +11,7 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
   const [error, setError] = useState(null);
   const [selectedContainer, setSelectedContainer] = useState('');
   const [showPrevious, setShowPrevious] = useState(false);
-  const [tailLines, setTailLines] = useState(100);
+  const [tailLines] = useState(DEFAULT_TAIL_LINES);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const logsContainerRef = useRef(null);
@@ -211,20 +211,6 @@ const PodLogsModal = ({ isOpen, onClose, pod, isDark = false }) => {
               </select>
             )}
 
-            {/* Lines selector */}
-            <select
-              value={tailLines}
-              onChange={(e) => setTailLines(Number(e.target.value))}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                isDark
-                  ? 'bg-gray-700 border-gray-600 text-gray-200'
-                  : 'bg-white border-gray-300 text-gray-900'
-              }`}
-            >
-              {LINE_OPTIONS.map(num => (
-                <option key={num} value={num}>Last {num} lines</option>
-              ))}
-            </select>
 
             {/* Previous logs toggle */}
             <label className={`flex items-center space-x-2 text-sm ${textMuted}`}>
