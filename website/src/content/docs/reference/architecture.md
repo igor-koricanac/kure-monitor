@@ -82,7 +82,7 @@ The brain. Receives reports, generates AI solutions, stores results, broadcasts 
 │   ├── /llm                    # LLM config + test
 │   ├── /excluded-*             # suppressions
 │   ├── /notifications          # Slack / Teams
-│   └── /settings/*             # retention, mirror TTL
+│   └── /settings/*             # mirror TTL
 └── /ws                         # WebSocket
 ```
 

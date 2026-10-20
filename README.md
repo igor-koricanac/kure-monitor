@@ -31,7 +31,7 @@ Unlike tools such as K8sGPT that are CLI-focused, Kure gives you a unified web d
 - **Multi-LLM Profiles & Custom Instructions** — Register multiple AI providers with automatic failover, on-demand per-triage selection, and prepend custom Markdown (`.md`) cluster instructions
 - **Real-time Failure Detection & Live Pods** — Triage failing pods (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), inspect cluster-wide Live Pods, and stream real-time container logs with play/pause controls
 - **Security Scanning** — 50+ checks including privileged containers, host namespace access, dangerous capabilities, missing seccomp/AppArmor profiles, root containers, RBAC misconfigurations, untrusted image registries, and missing resource limits
-- **Pod Lifecycle Management** — Track pods through investigating, resolved, and ignored states with configurable history retention
+- **Pod Lifecycle Management** — Track pods through investigating, resolved, and active states
 
 **Dashboard & Enterprise Governance**
 - **Diagram Tab** — Interactive Kubernetes topology graph. Switch between per-namespace and per-workload views, click any node to view its manifest, click an edge to focus that path (highlights ancestors and descendants, dims everything else)

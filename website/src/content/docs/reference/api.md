@@ -439,8 +439,7 @@ POST /api/admin/settings/{key}    { "value": "10080" }
 
 Common keys:
 
-- `history_retention_minutes` — auto-delete resolved pods after N minutes (`0` = disabled)
-- `ignored_retention_minutes` — auto-delete ignored pods after N minutes (`0` = disabled)
+- `mirror_pod_ttl_seconds` — time-to-live for temporary mirror pods in seconds (default: `180`)
 
 ## WebSocket
 

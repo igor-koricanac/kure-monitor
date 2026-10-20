@@ -41,7 +41,6 @@ Pods cycle through:
 | **Resolved** | Fixed; moved to history |
 | **Ignored** | Intentionally hidden |
 
-Configure auto-cleanup of resolved and ignored pods from **Admin → Settings → History Retention**.
 
 ### Authentication & Access Control
 

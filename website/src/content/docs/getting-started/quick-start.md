@@ -54,6 +54,6 @@ Open the **Security** tab. The scanner audits all pods on a schedule and on dema
 ## What's next
 
 - [Features overview](/features/overview/) — every tab and what it does
-- [Configuration overview](/configuration/overview/) — Helm values, env vars, retention
+- [Configuration overview](/configuration/overview/) — Helm values, env vars, admin settings
 - [Authentication](/configuration/authentication/) — how user accounts and the service token work
 - [Troubleshooting](/reference/troubleshooting/) — when things don't go to plan

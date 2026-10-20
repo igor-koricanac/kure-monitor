@@ -8,7 +8,7 @@ Kure Monitor is configured in three layers:
 | Layer | What it controls | Set via |
 |-------|------------------|---------|
 | **Helm chart** | Resource limits, replicas, image tags, ingress, PostgreSQL, Prometheus, NetworkPolicies | `values.yaml` or `--set` |
-| **Admin panel (in dashboard)** | LLM provider, notifications, exclusions, trusted registries, retention, mirror pod TTL | The **Admin** tab in the UI |
+| **Admin panel (in dashboard)** | LLM provider, notifications, exclusions, trusted registries, mirror pod TTL | The **Admin** tab in the UI |
 | **Bootstrap Secret** | `SERVICE_TOKEN` and `SESSION_SECRET` for auth | Auto-created by the chart on first install |
 
 Anything that changes between environments (db password, ingress host, replicas) belongs in Helm values. Anything that changes per-team or per-week (which LLM, which namespaces to exclude, where to send Slack alerts) belongs in the Admin panel — those settings persist in PostgreSQL and survive upgrades.
