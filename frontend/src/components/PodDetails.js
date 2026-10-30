@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, RefreshCw, Terminal, CheckCircle, RotateCcw, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
+import { FileText, RefreshCw, Terminal, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
 import SolutionMarkdown from './SolutionMarkdown';
 import TroubleshootSection from './TroubleshootSection';
 import { api } from '../services/api';
@@ -101,10 +101,8 @@ const MirrorPodStatus = ({ mirror, onDelete, onRefresh, isDark = false }) => {
   );
 };
 
-const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpdated, onLogAwareSolutionUpdated, onStatusChange, onDeleteRecord, isDark = false, aiEnabled = false, viewMode = 'active', activeMirror, onDeleteMirror, onRefreshMirror, canWrite = true }) => {
+const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpdated, onLogAwareSolutionUpdated, isDark = false, aiEnabled = false, activeMirror, onDeleteMirror, onRefreshMirror, canWrite = true }) => {
   const [isRetrying, setIsRetrying] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [availableLLMs, setAvailableLLMs] = useState([]);
   const [selectedLLMId, setSelectedLLMId] = useState('');
@@ -184,26 +182,6 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
       handleRetrySolution();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleStatusAction = async (newStatus) => {
-    if (!onStatusChange) return;
-    setIsUpdatingStatus(true);
-    try {
-      await onStatusChange(pod.id, newStatus);
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!onDeleteRecord) return;
-    setIsDeleting(true);
-    try {
-      await onDeleteRecord(pod.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const formatTimestamp = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
@@ -341,57 +319,6 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Workflow Actions */}
-      {onStatusChange && (
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Resolved status: show resolution info + delete */}
-          {pod.status === 'resolved' && (
-            <div className={`flex items-center text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium mr-2 border ${isDark ? 'bg-green-900/50 text-green-300 border-green-700' : 'bg-green-100 text-green-800 border-green-300'}`}>
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Resolved
-              </span>
-              {pod.resolved_at && <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>on {new Date(pod.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
-              {pod.resolution_note && <span className={`ml-2 italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>— {pod.resolution_note}</span>}
-              {onDeleteRecord && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`ml-auto shrink-0 inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Ignored status: Restore + Delete buttons */}
-          {pod.status === 'ignored' && (
-            <>
-              <button
-                onClick={() => handleStatusAction('new')}
-                disabled={isUpdatingStatus}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-blue-300 bg-blue-900/40 border border-blue-700 hover:bg-blue-900/60' : 'text-blue-700 bg-blue-100 border border-blue-300 hover:bg-blue-200'}`}
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                Restore
-              </button>
-              {onDeleteRecord && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
-              )}
-            </>
-          )}
         </div>
       )}
 

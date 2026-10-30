@@ -23,6 +23,13 @@ const Dashboard = () => {
     return user?.effective_tabs || (isAdmin ? ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice', 'admin'] : []);
   }, [user?.effective_tabs, isAdmin]);
 
+  const isNamespaceAllowed = useCallback((ns) => {
+    if (!ns) return true;
+    if (isAdmin || user?.all_namespaces) return true;
+    if (!Array.isArray(user?.effective_namespaces)) return true;
+    return user.effective_namespaces.includes(ns);
+  }, [isAdmin, user?.all_namespaces, user?.effective_namespaces]);
+
   const [activeTab, setActiveTab] = useState('monitoring');
   const [pods, setPods] = useState([]);
   const [securityFindings, setSecurityFindings] = useState([]);
@@ -131,6 +138,7 @@ const Dashboard = () => {
   // Handle WebSocket messages - wrapped in useCallback for stability
   const handleWebSocketMessage = useCallback((message) => {
     if (message.type === 'pod_failure') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Update or add pod failure (deduplicate by id OR by pod_name+namespace)
       setPods(prevPods => {
         // Check by ID first (most reliable), then by name+namespace
@@ -163,6 +171,7 @@ const Dashboard = () => {
         )
       );
     } else if (message.type === 'security_finding') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Show banner when findings are being added/updated (rescan in progress)
       showSecurityBanner();
       // Update or add security finding (deduplicate by id OR by resource_name+namespace+title)
@@ -189,6 +198,7 @@ const Dashboard = () => {
         }
       });
     } else if (message.type === 'security_finding_deleted') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Show banner when findings are being deleted (rescan in progress)
       showSecurityBanner();
       // Remove deleted security finding from list
@@ -223,6 +233,7 @@ const Dashboard = () => {
       message.type === 'advice_finding_deleted' ||
       message.type === 'advice_scan_status'
     ) {
+      if (message.data?.namespace && !isNamespaceAllowed(message.data.namespace)) return;
       // Forward to AdvicePanel via a bumped sequence number so the panel's
       // useEffect re-runs on every message even if the payload repeats.
       adviceSeqRef.current += 1;
@@ -232,6 +243,7 @@ const Dashboard = () => {
         data: message.data,
       });
     } else if (message.type === 'pod_solution_updated') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Update pod with new solution
       setPods(prevPods => {
         return prevPods.map(pod =>
@@ -240,6 +252,7 @@ const Dashboard = () => {
       });
     } else if (message.type === 'pod_status_change') {
       const pod = message.data;
+      if (!isNamespaceAllowed(pod?.namespace)) return;
       const newStatus = pod.status;
       // Remove from active list
       setPods(prev => prev.filter(p => p.id !== pod.id));
@@ -247,12 +260,8 @@ const Dashboard = () => {
       if (newStatus === 'new' || newStatus === 'investigating') {
         setPods(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
       }
-    } else if (message.type === 'pod_record_deleted') {
-      // Pod record deleted
-      const deletedId = message.data.id;
-      setPods(prev => prev.filter(p => p.id !== deletedId));
     }
-  }, [showSecurityBanner]);
+  }, [showSecurityBanner, isNamespaceAllowed]);
 
   // Handle solution update from retry button
   const handleSolutionUpdated = (updatedPod) => {

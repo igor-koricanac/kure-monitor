@@ -268,8 +268,8 @@ class PodFailureMixin:
             return self._row_to_pod_failure(row)
 
     async def dismiss_pod_failure(self, failure_id: int):
-        """Mark a pod failure as ignored (backward compat)"""
-        await self.update_pod_status(failure_id, "ignored")
+        """Mark a pod failure as resolved/dismissed"""
+        await self.update_pod_status(failure_id, "resolved")
 
     async def restore_pod_failure(self, failure_id: int):
         """Restore a pod failure back to new (backward compat)"""
@@ -299,27 +299,3 @@ class PodFailureMixin:
             )
             count = int(result.split()[-1]) if result else 0
             return count > 0
-
-    async def cleanup_old_resolved_pods(self, retention_minutes: int) -> int:
-        """Delete resolved pods older than the retention period (in minutes)."""
-        async with self._acquire() as conn:
-            result = await conn.execute(
-                """DELETE FROM pod_failures
-                   WHERE status = 'resolved'
-                   AND resolved_at < NOW() - INTERVAL '1 minute' * $1""",
-                retention_minutes,
-            )
-            count = int(result.split()[-1]) if result else 0
-            return count
-
-    async def cleanup_old_ignored_pods(self, retention_minutes: int) -> int:
-        """Delete ignored pods older than the retention period (in minutes)."""
-        async with self._acquire() as conn:
-            result = await conn.execute(
-                """DELETE FROM pod_failures
-                   WHERE status = 'ignored'
-                   AND created_at < NOW() - INTERVAL '1 minute' * $1""",
-                retention_minutes,
-            )
-            count = int(result.split()[-1]) if result else 0
-            return count

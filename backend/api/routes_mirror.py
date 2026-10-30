@@ -4,7 +4,7 @@ import logging
 
 from models.models import (
     MirrorDeployRequest, MirrorDeployResponse, MirrorPreviewResponse,
-    MirrorStatusResponse, MirrorActiveItem, MirrorTTLSetting,
+    MirrorStatusResponse, MirrorActiveItem,
 )
 from services.mirror_service import MirrorService
 from .auth import require_write
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_mirror_router(deps: RouterDeps, mirror_service: MirrorService) -> APIRouter:
-    """Mirror pod deploy, status, delete, list, and TTL settings."""
+    """Mirror pod deploy, status, delete, and list."""
     router = APIRouter()
 
     @router.post("/mirror/preview/{pod_id}", response_model=MirrorPreviewResponse, dependencies=[Depends(require_write)])
@@ -116,34 +116,6 @@ def create_mirror_router(deps: RouterDeps, mirror_service: MirrorService) -> API
             ]
         except Exception as e:
             logger.error(f"Error listing active mirrors: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.get("/admin/settings/mirror-ttl", response_model=MirrorTTLSetting)
-    async def get_mirror_ttl():
-        """Get the default mirror pod TTL setting."""
-        try:
-            ttl = await mirror_service.get_default_ttl()
-            return MirrorTTLSetting(seconds=ttl)
-        except Exception as e:
-            logger.error(f"Error getting mirror TTL: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.put("/admin/settings/mirror-ttl", response_model=MirrorTTLSetting, dependencies=[Depends(require_write)])
-    async def set_mirror_ttl(request: MirrorTTLSetting):
-        """Set the default mirror pod TTL (seconds). Min 30, max 3600."""
-        try:
-            if request.seconds < 30 or request.seconds > 3600:
-                raise HTTPException(
-                    status_code=400,
-                    detail="TTL must be between 30 and 3600 seconds"
-                )
-            await mirror_service.set_default_ttl(request.seconds)
-            logger.info(f"Mirror TTL set to {request.seconds} seconds")
-            return MirrorTTLSetting(seconds=request.seconds)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error setting mirror TTL: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     return router

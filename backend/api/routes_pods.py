@@ -33,12 +33,6 @@ class DismissDeletedPodRequest(BaseModel):
     pod_name: str = Field(..., min_length=1, max_length=253)
 
 
-class RetentionMinutesRequest(BaseModel):
-    """Auto-delete retention window in minutes. 0 disables; max 30 days."""
-
-    minutes: int = Field(..., ge=0, le=43200)
-
-
 LOG_CAPTURE_REASONS = {"CrashLoopBackOff", "OOMKilled", "Error"}
 
 logger = logging.getLogger(__name__)
@@ -150,6 +144,7 @@ def create_pod_ingest_router(deps: RouterDeps) -> APIRouter:
                                 pod_id=pod_id,
                                 solution=log_aware_solution,
                                 generated_at=generated_at_iso,
+                                namespace=report.namespace,
                             )
                         except Exception as ws_err:
                             logger.warning(
@@ -266,12 +261,34 @@ def create_pod_ingest_router(deps: RouterDeps) -> APIRouter:
 
 
 def create_pod_router(deps: RouterDeps) -> APIRouter:
-    """User-facing pod routes (CRUD, status, history, retry-solution, retention settings)."""
+    """User-facing pod routes (CRUD, status, retry-solution)."""
     router = APIRouter()
     db = deps.db
     solution_engine = deps.solution_engine
     websocket_manager = deps.websocket_manager
     notification_service = deps.notification_service
+
+    async def _check_pod_namespace_access(user: Optional[dict], namespace: str) -> None:
+        """Raise 403 if user does not have permission to access the pod's namespace."""
+        if not user or user.get("role") == "admin":
+            return
+        if "all_namespaces" in user:
+            if not user.get("all_namespaces"):
+                allowed_ns = set(user.get("namespaces", []))
+                if namespace not in allowed_ns:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied to namespace '{namespace}'",
+                    )
+            return
+        perms = await db.get_user_effective_permissions(user)
+        if not perms.get("all_namespaces"):
+            allowed_ns = set(perms.get("namespaces", []))
+            if namespace not in allowed_ns:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Access denied to namespace '{namespace}'",
+                )
 
     @router.get("/pods/failed", response_model=list[PodFailureResponse])
     async def get_failed_pods(request: Request):
@@ -289,29 +306,13 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Error getting pod failures: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.get("/pods/ignored", response_model=list[PodFailureResponse])
-    async def get_ignored_pods(request: Request):
-        """Get all ignored pods from database, filtered by user team namespaces if restricted."""
-        try:
-            failures = await db.get_pod_failures(
-                include_dismissed=True, dismissed_only=True
-            )
-            user = getattr(request.state, "user", None)
-            if user and user.get("role") != "admin":
-                perms = await db.get_user_effective_permissions(user)
-                if not perms.get("all_namespaces"):
-                    allowed_ns = set(perms.get("namespaces", []))
-                    failures = [p for p in failures if p.namespace in allowed_ns]
-            return failures
-        except Exception as e:
-            logger.error(f"Error getting ignored pods: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.delete("/pods/failed/{pod_id}", dependencies=[Depends(require_write)])
-    async def dismiss_pod_failure(pod_id: int):
+    @router.delete("/pods/failed/{pod_id}")
+    async def dismiss_pod_failure(pod_id: int, user: dict = Depends(require_write)):
         """Mark a pod failure as resolved/dismissed"""
         try:
             pod_failure = await db.get_pod_failure_by_id(pod_id)
+            if pod_failure:
+                await _check_pod_namespace_access(user, pod_failure.namespace)
             await db.dismiss_pod_failure(pod_id)
 
             if pod_failure and notification_service:
@@ -320,20 +321,10 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
                 )
 
             return {"message": "Pod failure dismissed"}
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error dismissing pod failure: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.put("/pods/ignored/{pod_id}/restore", dependencies=[Depends(require_write)])
-    async def restore_pod_failure(pod_id: int):
-        """Restore/un-ignore a dismissed pod failure"""
-        try:
-            updated = await db.update_pod_status(pod_id, "new")
-            if updated:
-                await websocket_manager.broadcast_pod_status_change(updated)
-            return {"message": "Pod failure restored"}
-        except Exception as e:
-            logger.error(f"Error restoring pod failure: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.patch(
@@ -341,8 +332,8 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
         response_model=PodFailureResponse,
     )
     async def update_pod_status(pod_id: int, request: PodStatusUpdate, user: dict = Depends(require_write)):
-        """Update the status of a pod failure (acknowledge, resolve, ignore)"""
-        valid_statuses = {"new", "investigating", "resolved", "ignored"}
+        """Update the status of a pod failure (acknowledge, resolve)"""
+        valid_statuses = {"new", "investigating", "resolved"}
         if request.status not in valid_statuses:
             raise HTTPException(
                 status_code=400,
@@ -350,9 +341,8 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             )
 
         valid_transitions = {
-            "new": {"investigating", "ignored"},
-            "investigating": {"ignored"},
-            "ignored": {"new"},
+            "new": {"investigating", "resolved"},
+            "investigating": {"resolved"},
             "resolved": set(),
         }
 
@@ -360,6 +350,8 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             pod_failure = await db.get_pod_failure_by_id(pod_id)
             if not pod_failure:
                 raise HTTPException(status_code=404, detail="Pod failure not found")
+
+            await _check_pod_namespace_access(user, pod_failure.namespace)
 
             current_status = pod_failure.status
             if request.status not in valid_transitions.get(current_status, set()):
@@ -377,7 +369,7 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             if updated:
                 await websocket_manager.broadcast_pod_status_change(updated)
 
-                if request.status in ("resolved", "ignored") and notification_service:
+                if request.status == "resolved" and notification_service:
                     await notification_service.send_pod_resolved_notification(
                         namespace=updated.namespace, pod_name=updated.pod_name
                     )
@@ -390,26 +382,22 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Error updating pod status: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.get("/pods/history", response_model=list[PodFailureResponse])
-    async def get_pod_history():
-        """Get resolved pod failures (history)"""
-        try:
-            return await db.get_pod_failures(status_filter=["resolved"])
-        except Exception as e:
-            logger.error(f"Error getting pod history: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
     @router.post(
         "/pods/failed/{pod_id}/retry-solution",
         response_model=PodFailureResponse,
-        dependencies=[Depends(require_write)],
     )
-    async def retry_ai_solution(pod_id: int, llm_id: Optional[int] = None):
+    async def retry_ai_solution(
+        pod_id: int,
+        llm_id: Optional[int] = None,
+        user: dict = Depends(require_write),
+    ):
         """Retry generating AI solution for a pod failure, optionally using a specific registered LLM"""
         try:
             pod_failure = await db.get_pod_failure_by_id(pod_id)
             if not pod_failure:
                 raise HTTPException(status_code=404, detail="Pod failure not found")
+
+            await _check_pod_namespace_access(user, pod_failure.namespace)
 
             logger.info(
                 f"Retrying AI solution for pod: {pod_failure.namespace}/{pod_failure.pod_name} (llm_id={llm_id})"
@@ -457,11 +445,12 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Error details: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.post(
-        "/pods/failed/{pod_id}/troubleshoot", dependencies=[Depends(require_write)]
-    )
+    @router.post("/pods/failed/{pod_id}/troubleshoot")
     async def troubleshoot_pod(
-        pod_id: int, regenerate: bool = False, llm_id: Optional[int] = None
+        pod_id: int,
+        regenerate: bool = False,
+        llm_id: Optional[int] = None,
+        user: dict = Depends(require_write),
     ):
         """Generate a log-aware AI troubleshoot solution using captured logs.
 
@@ -471,6 +460,7 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
         pod = await db.get_pod_failure_by_id(pod_id)
         if not pod:
             raise HTTPException(status_code=404, detail="Pod failure not found")
+        await _check_pod_namespace_access(user, pod.namespace)
         if pod.failure_reason not in LOG_CAPTURE_REASONS:
             raise HTTPException(
                 status_code=400,
@@ -521,6 +511,7 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
                 pod_id=pod_id,
                 solution=solution,
                 generated_at=generated_at_iso,
+                namespace=pod.namespace,
             )
         except Exception as ws_err:
             logger.warning(f"Failed to broadcast troubleshoot update: {ws_err}")
@@ -532,36 +523,6 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             "log_aware": True,
         }
 
-    @router.delete("/pods/records/{pod_id}", dependencies=[Depends(require_write)])
-    async def delete_pod_record(pod_id: int):
-        """Permanently delete a resolved or ignored pod failure record"""
-        try:
-            pod_failure = await db.get_pod_failure_by_id(pod_id)
-            if not pod_failure:
-                raise HTTPException(status_code=404, detail="Pod failure not found")
-
-            if pod_failure.status not in ("resolved", "ignored"):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Can only delete resolved or ignored records (current status: {pod_failure.status})",
-                )
-
-            deleted = await db.delete_pod_failure(pod_id)
-            if not deleted:
-                raise HTTPException(status_code=500, detail="Failed to delete record")
-
-            await websocket_manager.broadcast_pod_record_deleted(pod_id)
-
-            logger.info(
-                f"Deleted pod record: {pod_failure.namespace}/{pod_failure.pod_name} (id={pod_id})"
-            )
-            return {"message": "Pod record deleted"}
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error deleting pod record: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
     @router.get("/pods/{namespace}/{pod_name}/manifest")
     async def get_pod_manifest(namespace: str, pod_name: str):
         """Get pod manifest YAML from Kubernetes API"""
@@ -569,54 +530,6 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             return {"error": "Pod manifest retrieval not implemented yet"}
         except Exception as e:
             logger.error(f"Error getting pod manifest: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.get("/admin/settings/history-retention")
-    async def get_history_retention():
-        """Get the history auto-delete retention setting (minutes, 0 = disabled)"""
-        try:
-            value = await db.get_app_setting("history_retention_minutes")
-            return {"minutes": int(value) if value else 0}
-        except Exception as e:
-            logger.error(f"Error getting history retention: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.put(
-        "/admin/settings/history-retention", dependencies=[Depends(require_write)]
-    )
-    async def set_history_retention(request: RetentionMinutesRequest):
-        """Set the history auto-delete retention (minutes). 0 = disabled. Max 43200 (30 days)."""
-        minutes = request.minutes
-        try:
-            await db.set_app_setting("history_retention_minutes", str(minutes))
-            logger.info(f"History retention set to {minutes} minutes")
-            return {"minutes": minutes}
-        except Exception as e:
-            logger.error(f"Error setting history retention: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.get("/admin/settings/ignored-retention")
-    async def get_ignored_retention():
-        """Get the ignored pods auto-delete retention setting (minutes, 0 = disabled)"""
-        try:
-            value = await db.get_app_setting("ignored_retention_minutes")
-            return {"minutes": int(value) if value else 0}
-        except Exception as e:
-            logger.error(f"Error getting ignored retention: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.put(
-        "/admin/settings/ignored-retention", dependencies=[Depends(require_write)]
-    )
-    async def set_ignored_retention(request: RetentionMinutesRequest):
-        """Set the ignored pods auto-delete retention (minutes). 0 = disabled. Max 43200 (30 days)."""
-        minutes = request.minutes
-        try:
-            await db.set_app_setting("ignored_retention_minutes", str(minutes))
-            logger.info(f"Ignored retention set to {minutes} minutes")
-            return {"minutes": minutes}
-        except Exception as e:
-            logger.error(f"Error setting ignored retention: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/pods/live")

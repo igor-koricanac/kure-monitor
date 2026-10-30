@@ -23,37 +23,6 @@ from api.middleware import configure_cors, configure_gzip, configure_exception_h
 logger = logging.getLogger(__name__)
 
 
-async def history_cleanup_task(db: Database):
-    """Background task that periodically cleans up old resolved and ignored pods based on retention settings"""
-    while True:
-        try:
-            await asyncio.sleep(60)  # Check every minute
-
-            # Cleanup resolved pods
-            value = await db.get_app_setting("history_retention_minutes")
-            retention_minutes = int(value) if value else 0
-            if retention_minutes > 0:
-                count = await db.cleanup_old_resolved_pods(retention_minutes)
-                if count > 0:
-                    logger.info(
-                        f"History cleanup: deleted {count} resolved pods older than {retention_minutes}m"
-                    )
-
-            # Cleanup ignored pods
-            ignored_value = await db.get_app_setting("ignored_retention_minutes")
-            ignored_minutes = int(ignored_value) if ignored_value else 0
-            if ignored_minutes > 0:
-                count = await db.cleanup_old_ignored_pods(ignored_minutes)
-                if count > 0:
-                    logger.info(
-                        f"Ignored cleanup: deleted {count} ignored pods older than {ignored_minutes}m"
-                    )
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error(f"Error in history cleanup task: {e}")
-
-
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application"""
 
@@ -92,10 +61,6 @@ def create_app() -> FastAPI:
         await solution_engine.initialize()
         logger.info("Solution engine initialized")
 
-        # Start background cleanup task
-        cleanup_task = asyncio.create_task(history_cleanup_task(db))
-        logger.info("History cleanup background task started")
-
         # Start mirror pod cleanup task
         await mirror_service.start_cleanup_task()
 
@@ -103,11 +68,6 @@ def create_app() -> FastAPI:
 
         # Shutdown
         await mirror_service.stop_cleanup_task()
-        cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
         # Close shared aiohttp sessions held by long-lived services.
         try:
             await solution_engine.close()

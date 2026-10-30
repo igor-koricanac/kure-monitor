@@ -3,13 +3,12 @@ import PodTableRow from '../PodTableRow';
 
 // Mock child components that have complex dependencies
 jest.mock('../PodDetails', () => {
-  return function MockPodDetails({ pod, onStatusChange, onDeleteRecord, onTestFix }) {
+  return function MockPodDetails({ pod, onSolutionUpdated, onTestFix }) {
     return (
       <div data-testid="pod-details">
         <h3>Error Details</h3>
         <p>{pod.solution}</p>
-        {onStatusChange && <button>Resolve</button>}
-        {onDeleteRecord && <button>Delete</button>}
+        {onSolutionUpdated && <button>Regenerate</button>}
         {onTestFix && <button>Test fix</button>}
       </div>
     );
@@ -189,8 +188,7 @@ describe('PodTableRow', () => {
           <PodTableRow
             pod={mockPod}
             canWrite={false}
-            onStatusChange={jest.fn()}
-            onDeleteRecord={jest.fn()}
+            onSolutionUpdated={jest.fn()}
           />
         </tbody>
       </table>
@@ -202,8 +200,7 @@ describe('PodTableRow', () => {
 
     // PodDetails only renders action buttons when callbacks are passed.
     // With canWrite=false, PodTableRow passes `undefined` for mutations.
-    expect(screen.queryByText('Resolve')).not.toBeInTheDocument();
-    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+    expect(screen.queryByText('Regenerate')).not.toBeInTheDocument();
     expect(screen.queryByText('Test fix')).not.toBeInTheDocument();
   });
 
@@ -214,8 +211,7 @@ describe('PodTableRow', () => {
           <PodTableRow
             pod={mockPod}
             canWrite={true}
-            onStatusChange={jest.fn()}
-            onDeleteRecord={jest.fn()}
+            onSolutionUpdated={jest.fn()}
           />
         </tbody>
       </table>
@@ -224,8 +220,7 @@ describe('PodTableRow', () => {
     const chevron = screen.getByTestId('chevron-right').closest('button');
     fireEvent.click(chevron);
 
-    expect(screen.getByText('Resolve')).toBeInTheDocument();
-    expect(screen.getByText('Delete')).toBeInTheDocument();
+    expect(screen.getByText('Regenerate')).toBeInTheDocument();
     // Test fix only shows if onTestFix is passed (it is, via PodTableRow)
     expect(screen.getByText('Test fix')).toBeInTheDocument();
   });

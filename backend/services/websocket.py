@@ -13,23 +13,49 @@ logger = logging.getLogger(__name__)
 class WebSocketManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.connection_principals: dict[WebSocket, dict] = {}
         self.router = APIRouter()
         self.router.websocket("/ws")(self.websocket_endpoint)
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, principal: Optional[dict] = None):
         await websocket.accept()
         self.active_connections.append(websocket)
+        if principal is not None:
+            self.connection_principals[websocket] = principal
         WEBSOCKET_CONNECTIONS_ACTIVE.inc()
         logger.info(
             f"WebSocket connected. Total connections: {len(self.active_connections)}"
         )
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-        WEBSOCKET_CONNECTIONS_ACTIVE.dec()
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            WEBSOCKET_CONNECTIONS_ACTIVE.dec()
+        self.connection_principals.pop(websocket, None)
         logger.info(
             f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
         )
+
+    async def _can_receive_namespace(self, connection: WebSocket, namespace: Optional[str]) -> bool:
+        """Check if a connected WebSocket client is permitted to receive events for a namespace."""
+        if not namespace:
+            return True
+        principal = self.connection_principals.get(connection)
+        if not principal or principal.get("kind") == "service" or principal.get("role") == "admin":
+            return True
+        db = getattr(getattr(connection, "app", None), "state", None)
+        db = getattr(db, "db", None) if db else None
+        if not db or not hasattr(db, "get_user_effective_permissions"):
+            return True
+        try:
+            perms = await db.get_user_effective_permissions(principal)
+            if perms.get("all_namespaces"):
+                return True
+            allowed_ns = set(perms.get("namespaces", []))
+            return namespace in allowed_ns
+        except Exception as e:
+            logger.warning(f"Failed to check WS namespace permissions: {e}")
+            return False
 
     async def _broadcast(
         self, message_type: str, data, description: str = None, parallel: bool = False
@@ -50,11 +76,15 @@ class WebSocketManager:
         if hasattr(data, "model_dump"):
             data = data.model_dump()
 
+        namespace = data.get("namespace") if isinstance(data, dict) else None
+
         if parallel:
             serialized = json.dumps({"type": message_type, "data": data}, default=str)
 
             async def send_to_client(connection):
                 try:
+                    if not await self._can_receive_namespace(connection, namespace):
+                        return True, connection
                     await asyncio.wait_for(
                         connection.send_text(serialized), timeout=10.0
                     )
@@ -79,10 +109,13 @@ class WebSocketManager:
                         disconnected.append(conn)
         else:
             message = {"type": message_type, "data": data}
+            serialized = json.dumps(message, default=str)
             disconnected = []
-            for connection in self.active_connections:
+            for connection in list(self.active_connections):
                 try:
-                    await connection.send_text(json.dumps(message, default=str))
+                    if not await self._can_receive_namespace(connection, namespace):
+                        continue
+                    await connection.send_text(serialized)
                 except Exception as e:
                     logger.warning(f"Failed to send {desc} to WebSocket: {e}")
                     disconnected.append(connection)
@@ -90,6 +123,7 @@ class WebSocketManager:
         for conn in disconnected:
             if conn in self.active_connections:
                 self.active_connections.remove(conn)
+            self.connection_principals.pop(conn, None)
 
     # --- Pod broadcasts ---
 
@@ -107,26 +141,26 @@ class WebSocketManager:
         """Broadcast pod solution update to all connected clients"""
         await self._broadcast("pod_solution_updated", pod_failure)
 
-    async def broadcast_pod_record_deleted(self, pod_id: int):
-        """Broadcast permanent pod record deletion to all connected clients"""
-        await self._broadcast("pod_record_deleted", {"id": pod_id})
-
     async def broadcast_pod_status_change(self, pod_failure: PodFailureResponse):
         """Broadcast pod status change to all connected clients"""
         await self._broadcast("pod_status_change", pod_failure)
 
     async def broadcast_pod_troubleshoot_updated(
-        self, pod_id: int, solution: str, generated_at: Optional[str]
+        self,
+        pod_id: int,
+        solution: str,
+        generated_at: Optional[str],
+        namespace: Optional[str] = None,
     ):
         """Broadcast log-aware troubleshoot solution update to all connected clients"""
-        await self._broadcast(
-            "pod_troubleshoot_updated",
-            {
-                "pod_id": pod_id,
-                "solution": solution,
-                "generated_at": generated_at,
-            },
-        )
+        payload = {
+            "pod_id": pod_id,
+            "solution": solution,
+            "generated_at": generated_at,
+        }
+        if namespace:
+            payload["namespace"] = namespace
+        await self._broadcast("pod_troubleshoot_updated", payload)
 
     # --- Security broadcasts ---
 
@@ -251,7 +285,7 @@ class WebSocketManager:
             await websocket.close(code=4001, reason="Unauthorized")
             return
 
-        await self.connect(websocket)
+        await self.connect(websocket, principal=principal)
         try:
             while True:
                 # Keep connection alive

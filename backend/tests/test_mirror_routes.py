@@ -285,38 +285,3 @@ class TestMirrorRoutes:
 
         response = await client.delete("/api/mirror/xyz")
         assert response.status_code == 404
-
-    # --- GET /api/admin/settings/mirror-ttl ---
-
-    @pytest.mark.asyncio
-    async def test_get_mirror_ttl(self, client, mock_mirror_service):
-        """Returns the default TTL."""
-        mock_mirror_service.get_default_ttl.return_value = 180
-
-        response = await client.get("/api/admin/settings/mirror-ttl")
-        assert response.status_code == 200
-        assert response.json()["seconds"] == 180
-
-    # --- PUT /api/admin/settings/mirror-ttl ---
-
-    @pytest.mark.asyncio
-    async def test_set_mirror_ttl_success(self, client, mock_mirror_service):
-        """Sets a valid TTL."""
-        response = await client.put("/api/admin/settings/mirror-ttl", json={"seconds": 600})
-        assert response.status_code == 200
-        assert response.json()["seconds"] == 600
-        mock_mirror_service.set_default_ttl.assert_called_once_with(600)
-
-    @pytest.mark.asyncio
-    async def test_set_mirror_ttl_too_low(self, client, mock_mirror_service):
-        """Rejects TTL below minimum."""
-        response = await client.put("/api/admin/settings/mirror-ttl", json={"seconds": 10})
-        assert response.status_code == 400
-        assert "between 30 and 3600" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_set_mirror_ttl_too_high(self, client, mock_mirror_service):
-        """Rejects TTL above maximum."""
-        response = await client.put("/api/admin/settings/mirror-ttl", json={"seconds": 7200})
-        assert response.status_code == 400
-        assert "between 30 and 3600" in response.json()["detail"]

@@ -283,12 +283,6 @@ class Database:
     async def delete_pod_failure(self, failure_id):
         return await self._db.delete_pod_failure(failure_id)
 
-    async def cleanup_old_resolved_pods(self, retention_minutes):
-        return await self._db.cleanup_old_resolved_pods(retention_minutes)
-
-    async def cleanup_old_ignored_pods(self, retention_minutes):
-        return await self._db.cleanup_old_ignored_pods(retention_minutes)
-
     # Pod failure logs (captured previous-container logs)
     async def save_pod_failure_logs(self, pod_failure_id, payload):
         return await self._db.save_pod_failure_logs(pod_failure_id, payload)

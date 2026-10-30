@@ -82,12 +82,7 @@ spec:
 [ERROR] Sync aborted. Process terminating.`
     }
   ]),
-  getPodHistory: async () => ([]),
-  getIgnoredPods: async () => ([]),
-  getHistoryRetention: async () => ({ minutes: 10080 }),
-  getIgnoredRetention: async () => ({ minutes: 10080 }),
   updatePodStatus: async (id, status) => ({ id, status }),
-  deletePodRecord: async () => ({}),
   retrySolution: async (podId) => {
     return {
       id: podId,
@@ -495,7 +490,6 @@ spec:
   
   // Mirrors
   getActiveMirrors: async () => ([]),
-  getMirrorTTL: async () => ({ seconds: 3600 }),
   
   // Settings & Admin
   getLLMStatus: async () => ({ configured: true, provider: 'openai', model: 'gpt-4o' }),

@@ -78,13 +78,12 @@ async def test_dismiss_failed_pod(client: AsyncClient):
     response = await client.delete(f"/api/pods/failed/{pod_id}")
     assert response.status_code == 200
 
-    # Verify pod is in ignored list (dismissed pods)
-    response = await client.get("/api/pods/ignored")
+    # Verify pod is no longer in active failed pods list
+    response = await client.get("/api/pods/failed")
     assert response.status_code == 200
     pods = response.json()
     dismissed_pod = next((p for p in pods if p["id"] == pod_id), None)
-    assert dismissed_pod is not None
-    assert dismissed_pod["dismissed"] == True
+    assert dismissed_pod is None
 
 
 @pytest.mark.asyncio

@@ -17,15 +17,13 @@ const getWorkflowStatusBadge = (pod) => {
       };
     case 'resolved':
       return { label: 'Resolved', className: 'bg-green-100 text-green-800 border-green-300' };
-    case 'ignored':
-      return { label: 'Ignored', className: 'bg-gray-100 text-gray-600 border-gray-300' };
     case 'new':
     default:
       return { label: 'New', className: 'bg-red-100 text-red-800 border-red-300' };
   }
 };
 
-const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStatusChange, onDeleteRecord, aiEnabled = false, viewMode = 'active', canWrite = true }) => {
+const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStatusChange, aiEnabled = false, canWrite = true }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showManifest, setShowManifest] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
@@ -157,7 +155,7 @@ const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStat
             >
               <StatusBadge reason={pod.failure_reason} />
             </button>
-            {viewMode === 'active' && (() => {
+            {(() => {
               const badge = getWorkflowStatusBadge(pod);
               return (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${badge.className}`}>
@@ -179,18 +177,8 @@ const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStat
         </td>
         <td className={`px-6 py-3 text-sm align-top text-gray-500`}>
           <div>
-            {viewMode === 'history' && pod.resolved_at
-              ? formatTimestamp(pod.resolved_at)
-              : formatTimestamp(pod.timestamp)
-            }
+            {formatTimestamp(pod.timestamp)}
           </div>
-          {viewMode === 'history' && pod.resolution_note && (
-            <div className={`text-xs mt-1 text-gray-400`}>
-              {pod.resolution_note.length > 50
-                ? pod.resolution_note.substring(0, 50) + '...'
-                : pod.resolution_note}
-            </div>
-          )}
         </td>
       </tr>
       {isExpanded && (
@@ -203,10 +191,7 @@ const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStat
               onTestFix={canWrite ? () => setShowMirror(true) : undefined}
               onSolutionUpdated={canWrite ? onSolutionUpdated : undefined}
               onLogAwareSolutionUpdated={canWrite ? onLogAwareSolutionUpdated : undefined}
-              onStatusChange={canWrite ? onStatusChange : undefined}
-              onDeleteRecord={canWrite ? onDeleteRecord : undefined}
               aiEnabled={aiEnabled}
-              viewMode={viewMode}
               activeMirror={activeMirror}
               onDeleteMirror={canWrite ? handleDeleteMirror : undefined}
               onRefreshMirror={checkActiveMirror}

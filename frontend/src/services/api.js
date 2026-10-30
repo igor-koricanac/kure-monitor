@@ -375,58 +375,6 @@ export const api = {
     return response.json();
   },
 
-  getPodHistory: async () => {
-    const response = await authFetch(`${API_BASE}/api/pods/history`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  getIgnoredPods: async () => {
-    const response = await authFetch(`${API_BASE}/api/pods/ignored`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  deletePodRecord: async (podId) => {
-    const response = await authFetch(`${API_BASE}/api/pods/records/${podId}`, {
-      method: 'DELETE'
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  getHistoryRetention: async () => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/history-retention`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  setHistoryRetention: async (minutes) => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/history-retention`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ minutes })
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  getIgnoredRetention: async () => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/ignored-retention`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  setIgnoredRetention: async (minutes) => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/ignored-retention`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ minutes })
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
   retrySolution: async (podId, llmId = null) => {
     const url = llmId
       ? `${API_BASE}/api/pods/failed/${podId}/retry-solution?llm_id=${encodeURIComponent(llmId)}`
@@ -914,22 +862,6 @@ export const api = {
 
   getActiveMirrors: async () => {
     const response = await authFetch(`${API_BASE}/api/mirror/active`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  getMirrorTTL: async () => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/mirror-ttl`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
-  setMirrorTTL: async (seconds) => {
-    const response = await authFetch(`${API_BASE}/api/admin/settings/mirror-ttl`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seconds })
-    });
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
   },

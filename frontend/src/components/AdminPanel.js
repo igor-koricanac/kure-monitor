@@ -6,7 +6,6 @@ import ExclusionNamespaces from './admin/ExclusionNamespaces';
 import ExclusionPods from './admin/ExclusionPods';
 import ExclusionRules from './admin/ExclusionRules';
 import ExclusionRegistries from './admin/ExclusionRegistries';
-import RetentionSettings from './admin/RetentionSettings';
 import AdviceDetectorSettings from './admin/AdviceDetectorSettings';
 import UsersManager from './admin/UsersManager';
 import InvitationsManager from './admin/InvitationsManager';
@@ -33,7 +32,6 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
   const settingsSubTabs = [
     { id: 'access', label: 'Users & Teams', icon: Users },
     { id: 'sso', label: 'SSO / Keycloak', icon: KeyRound },
-    { id: 'retention', label: 'Retention & Limits', icon: Settings },
     { id: 'detectors', label: 'Advice Detectors', icon: Settings },
   ];
 
@@ -173,11 +171,6 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
           {/* Settings Sub-Tab: SSO / Keycloak */}
           {settingsSubTab === 'sso' && (
             <SSOSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
-          )}
-
-          {/* Settings Sub-Tab: Retention & Limits */}
-          {settingsSubTab === 'retention' && (
-            <RetentionSettings isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
           )}
 
           {/* Settings Sub-Tab: Advice Detectors */}
