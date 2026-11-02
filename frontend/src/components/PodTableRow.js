@@ -7,23 +7,7 @@ import PodLogsModal from './PodLogsModal';
 import MirrorPodModal from './MirrorPodModal';
 import { api } from '../services/api';
 
-const getWorkflowStatusBadge = (pod) => {
-  const status = pod.status || 'new';
-  switch (status) {
-    case 'investigating':
-      return { 
-        label: pod.acknowledged_by ? `Investigating (${pod.acknowledged_by})` : 'Investigating', 
-        className: 'bg-yellow-100 text-yellow-800 border-yellow-300' 
-      };
-    case 'resolved':
-      return { label: 'Resolved', className: 'bg-green-100 text-green-800 border-green-300' };
-    case 'new':
-    default:
-      return { label: 'New', className: 'bg-red-100 text-red-800 border-red-300' };
-  }
-};
-
-const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStatusChange, aiEnabled = false, canWrite = true }) => {
+const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, aiEnabled = false, canWrite = true }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showManifest, setShowManifest] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
@@ -155,14 +139,6 @@ const PodTableRow = ({ pod, onSolutionUpdated, onLogAwareSolutionUpdated, onStat
             >
               <StatusBadge reason={pod.failure_reason} />
             </button>
-            {(() => {
-              const badge = getWorkflowStatusBadge(pod);
-              return (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${badge.className}`}>
-                  {badge.label}
-                </span>
-              );
-            })()}
           </div>
         </td>
         <td className="px-6 py-3 align-top">

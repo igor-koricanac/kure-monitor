@@ -10,7 +10,6 @@ from core.config import FAILURE_LOGS_ENABLED
 from models.models import (
     PodFailureReport,
     PodFailureResponse,
-    PodStatusUpdate,
 )
 from services.prometheus_metrics import POD_FAILURES_TOTAL
 from .auth import require_write, require_service_token
@@ -325,61 +324,6 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Error dismissing pod failure: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-
-    @router.patch(
-        "/pods/failed/{pod_id}/status",
-        response_model=PodFailureResponse,
-    )
-    async def update_pod_status(pod_id: int, request: PodStatusUpdate, user: dict = Depends(require_write)):
-        """Update the status of a pod failure (acknowledge, resolve)"""
-        valid_statuses = {"new", "investigating", "resolved"}
-        if request.status not in valid_statuses:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
-            )
-
-        valid_transitions = {
-            "new": {"investigating", "resolved"},
-            "investigating": {"resolved"},
-            "resolved": set(),
-        }
-
-        try:
-            pod_failure = await db.get_pod_failure_by_id(pod_id)
-            if not pod_failure:
-                raise HTTPException(status_code=404, detail="Pod failure not found")
-
-            await _check_pod_namespace_access(user, pod_failure.namespace)
-
-            current_status = pod_failure.status
-            if request.status not in valid_transitions.get(current_status, set()):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot transition from '{current_status}' to '{request.status}'",
-                )
-
-            acknowledged_by = user.get("username") if request.status == "investigating" else None
-
-            updated = await db.update_pod_status(
-                pod_id, request.status, request.resolution_note, acknowledged_by
-            )
-
-            if updated:
-                await websocket_manager.broadcast_pod_status_change(updated)
-
-                if request.status == "resolved" and notification_service:
-                    await notification_service.send_pod_resolved_notification(
-                        namespace=updated.namespace, pod_name=updated.pod_name
-                    )
-
-            return updated
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error updating pod status: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.post(

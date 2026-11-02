@@ -69,10 +69,9 @@ class PodFailureResponse(PodFailureReport):
     solution: Optional[str] = ""
     timestamp: str
     dismissed: bool = False
-    status: str = "new"  # new, investigating, resolved, ignored
+    status: str = "new"  # new, resolved
     resolved_at: Optional[str] = None
     resolution_note: Optional[str] = None
-    acknowledged_by: Optional[str] = None
     logs_captured: bool = False
     log_aware_solution: Optional[str] = None
     log_aware_solution_generated_at: Optional[str] = None
@@ -82,11 +81,6 @@ class PodFailureResponse(PodFailureReport):
     # it first and the quick solution requires a manual retry.
     auto_solution_mode: str = "quick"
     is_new_failure: bool = True
-
-
-class PodStatusUpdate(BaseModel):
-    status: str  # investigating, resolved, ignored, new
-    resolution_note: Optional[str] = None
 
 
 class SecurityFinding(BaseModel):

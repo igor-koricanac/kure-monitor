@@ -361,20 +361,6 @@ export const api = {
     return response.json();
   },
 
-  updatePodStatus: async (podId, status, resolutionNote = null) => {
-    const body = { status };
-    if (resolutionNote) {
-      body.resolution_note = resolutionNote;
-    }
-    const response = await authFetch(`${API_BASE}/api/pods/failed/${podId}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-  },
-
   retrySolution: async (podId, llmId = null) => {
     const url = llmId
       ? `${API_BASE}/api/pods/failed/${podId}/retry-solution?llm_id=${encodeURIComponent(llmId)}`

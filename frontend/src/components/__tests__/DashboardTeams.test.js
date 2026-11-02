@@ -162,4 +162,72 @@ describe('Dashboard Team Permissions and Empty State', () => {
 
     expect(screen.queryByText('secret-pod-2')).not.toBeInTheDocument();
   });
+
+  test('ignores WebSocket security_finding events from unauthorized namespaces', async () => {
+    let wsHandler;
+    useWebSocket.mockImplementation((handler) => {
+      wsHandler = handler;
+      return { connected: true };
+    });
+
+    useAuth.mockReturnValue({
+      user: {
+        id: 2,
+        username: 'restricteduser',
+        role: 'member',
+        has_team: true,
+        all_namespaces: false,
+        effective_namespaces: ['allowed-ns'],
+        effective_access_level: 'read',
+        effective_tabs: ['security_scanner'],
+      },
+      userRole: 'member',
+      logout: jest.fn(),
+    });
+
+    render(<Dashboard />);
+    expect(await screen.findByText('Security Scan')).toBeInTheDocument();
+
+    // Send security_finding from restricted namespace -> should be ignored
+    act(() => {
+      wsHandler({
+        type: 'security_finding',
+        data: {
+          id: 201,
+          resource_type: 'Pod',
+          resource_name: 'secret-pod-sec',
+          namespace: 'restricted-ns',
+          severity: 'high',
+          category: 'Security',
+          title: 'Privileged container',
+          description: 'Runs privileged',
+          remediation: 'Disable privileged',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    expect(screen.queryByText('secret-pod-sec')).not.toBeInTheDocument();
+
+    // Send security_finding from allowed namespace -> should appear
+    act(() => {
+      wsHandler({
+        type: 'security_finding',
+        data: {
+          id: 202,
+          resource_type: 'Pod',
+          resource_name: 'allowed-pod-sec',
+          namespace: 'allowed-ns',
+          severity: 'high',
+          category: 'Security',
+          title: 'Privileged container',
+          description: 'Runs privileged',
+          remediation: 'Disable privileged',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    expect(screen.getByText(/allowed-pod-sec/)).toBeInTheDocument();
+  });
 });

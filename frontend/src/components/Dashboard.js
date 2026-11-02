@@ -282,20 +282,6 @@ const Dashboard = () => {
     setPods(applyUpdate);
   };
 
-  // Handle pod status change
-  const handleStatusChange = async (podId, newStatus) => {
-    try {
-      const updatedPod = await api.updatePodStatus(podId, newStatus);
-      // Remove from current list
-      setPods(prev => prev.filter(p => p.id !== podId));
-      if (newStatus === 'new' || newStatus === 'investigating') {
-        setPods(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      }
-    } catch (err) {
-      console.error('Failed to update pod status:', err);
-    }
-  };
-
   const { connected } = useWebSocket(handleWebSocketMessage);
 
   // Filter pods based on pod-specific namespace filter
@@ -938,7 +924,7 @@ const Dashboard = () => {
                       </p>
                     </div>
                   ) : (
-                    <PodTable pods={filteredPods} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} isDark={isDark} aiEnabled={aiEnabled} viewMode="active" canWrite={canWrite} />
+                    <PodTable pods={filteredPods} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} isDark={isDark} aiEnabled={aiEnabled} canWrite={canWrite} />
                   )}
                 </>
               )}

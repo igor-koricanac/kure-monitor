@@ -150,6 +150,28 @@ def create_security_router(deps: RouterDeps) -> APIRouter:
     solution_engine = deps.solution_engine
     websocket_manager = deps.websocket_manager
 
+    async def _check_finding_namespace_access(user: Optional[dict], namespace: str) -> None:
+        """Raise 403 if user does not have permission to access the finding's namespace."""
+        if not user or user.get("role") == "admin":
+            return
+        if "all_namespaces" in user:
+            if not user.get("all_namespaces"):
+                allowed_ns = set(user.get("namespaces", []))
+                if namespace not in allowed_ns:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied to namespace '{namespace}'",
+                    )
+            return
+        perms = await db.get_user_effective_permissions(user)
+        if not perms.get("all_namespaces"):
+            allowed_ns = set(perms.get("namespaces", []))
+            if namespace not in allowed_ns:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Access denied to namespace '{namespace}'",
+                )
+
     @router.get("/security/findings", response_model=list[SecurityFindingResponse])
     async def get_security_findings(
         request: Request,
@@ -188,37 +210,49 @@ def create_security_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Error getting security findings: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.delete(
-        "/security/findings/{finding_id}", dependencies=[Depends(require_write)]
-    )
-    async def dismiss_security_finding(finding_id: int):
+    @router.delete("/security/findings/{finding_id}")
+    async def dismiss_security_finding(
+        finding_id: int, user: dict = Depends(require_write)
+    ):
         """Mark a security finding as dismissed"""
         try:
+            finding = await db.get_security_finding_by_id(finding_id)
+            if finding:
+                await _check_finding_namespace_access(user, finding.namespace)
             await db.dismiss_security_finding(finding_id)
             return {"message": "Security finding dismissed"}
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error dismissing security finding: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.put(
-        "/security/findings/{finding_id}/restore", dependencies=[Depends(require_write)]
-    )
-    async def restore_security_finding(finding_id: int):
+    @router.put("/security/findings/{finding_id}/restore")
+    async def restore_security_finding(
+        finding_id: int, user: dict = Depends(require_write)
+    ):
         """Restore a dismissed security finding"""
         try:
+            finding = await db.get_security_finding_by_id(finding_id)
+            if finding:
+                await _check_finding_namespace_access(user, finding.namespace)
             await db.restore_security_finding(finding_id)
             return {"message": "Security finding restored"}
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error restoring security finding: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/security/findings/{finding_id}/manifest")
-    async def get_security_finding_manifest(finding_id: int):
+    async def get_security_finding_manifest(finding_id: int, request: Request):
         """Get the manifest and metadata for a security finding"""
         try:
             finding = await db.get_security_finding_by_id(finding_id)
             if not finding:
                 raise HTTPException(status_code=404, detail="Finding not found")
+            user = getattr(request.state, "user", None)
+            await _check_finding_namespace_access(user, finding.namespace)
             return {
                 "id": finding.id,
                 "manifest": (
@@ -238,15 +272,19 @@ def create_security_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Error getting security finding manifest: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    @router.post(
-        "/security/findings/{finding_id}/fix", dependencies=[Depends(require_write)]
-    )
-    async def generate_security_fix(finding_id: int, llm_id: Optional[int] = None):
+    @router.post("/security/findings/{finding_id}/fix")
+    async def generate_security_fix(
+        finding_id: int,
+        llm_id: Optional[int] = None,
+        user: dict = Depends(require_write),
+    ):
         """Generate an AI-powered security fix for a finding, optionally specifying target LLM"""
         try:
             finding = await db.get_security_finding_by_id(finding_id)
             if not finding:
                 raise HTTPException(status_code=404, detail="Finding not found")
+
+            await _check_finding_namespace_access(user, finding.namespace)
 
             if not finding.manifest:
                 return {
