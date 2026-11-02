@@ -10,6 +10,15 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 			<strong>Kure Monitor</strong>
 			<span class="muted">— Apache 2.0 licensed, open source on GitHub.</span>
 		</div>
+		<div class="footer-badges">
+			<a href="https://noonlaunch.com/product/kure-monitor" rel="dofollow">
+				<img src="https://noonlaunch.com/badges/kure-monitor.svg"
+					 alt="Featured on Noonlaunch" width="220" height="60" />
+			</a>
+			<a href="https://saascity.io" target="_blank" rel="noopener">
+				<img src="https://saascity.io/badges/featured-light.svg" alt="Featured on SaaSCity" width="150" height="54" />
+			</a>
+		</div>
 		<div class="links">
 			<a href="https://github.com/igor-koricanac/kure-monitor">GitHub</a>
 			<a href="https://artifacthub.io/packages/helm/kure-monitor/kure">Artifact Hub</a>
@@ -29,6 +38,7 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 	.kure-footer-inner {
 		display: flex;
 		justify-content: space-between;
+		align-items: center;
 		gap: 1rem;
 		flex-wrap: wrap;
 		font-size: 0.85rem;
@@ -36,6 +46,12 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 	}
 	.muted {
 		color: var(--sl-color-gray-3);
+	}
+	.footer-badges {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
 	}
 	.links {
 		display: flex;
