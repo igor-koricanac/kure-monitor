@@ -76,7 +76,13 @@ class WebSocketManager:
         if hasattr(data, "model_dump"):
             data = data.model_dump()
 
-        namespace = data.get("namespace") if isinstance(data, dict) else None
+        namespace = None
+        if isinstance(data, dict):
+            namespace = data.get("namespace") or (
+                data.get("scope", {}).get("namespace")
+                if isinstance(data.get("scope"), dict)
+                else None
+            )
 
         if parallel:
             serialized = json.dumps({"type": message_type, "data": data}, default=str)

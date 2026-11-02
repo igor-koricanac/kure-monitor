@@ -25,6 +25,8 @@ const AdvicePanel = ({
   isDark = false,
   canWrite = true,
   wsEvent = null, // {seq, type, data} — seq increments per message
+  userAllowedNamespaces = null,
+  isAdmin = true,
 }) => {
   const [findings, setFindings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,21 @@ const AdvicePanel = ({
   useEffect(() => {
     tabRef.current = tab;
   }, [tab]);
+
+  const scopeRef = useRef(scope);
+  useEffect(() => {
+    scopeRef.current = scope;
+  }, [scope]);
+
+  const isNamespaceAllowed = useCallback(
+    (ns) => {
+      if (!ns) return true;
+      if (isAdmin) return true;
+      if (!userAllowedNamespaces || userAllowedNamespaces.includes("*")) return true;
+      return userAllowedNamespaces.includes(ns);
+    },
+    [isAdmin, userAllowedNamespaces],
+  );
 
   // Export menu state.
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -206,6 +223,25 @@ const AdvicePanel = ({
     if (!type || !data) return;
 
     if (type === "advice_finding") {
+      if (!isNamespaceAllowed(data.namespace)) return;
+      const currentScope = scopeRef.current;
+      if (!currentScope?.namespace || data.namespace !== currentScope.namespace) {
+        return;
+      }
+      if (
+        currentScope.workload_kind &&
+        data.resource_kind &&
+        data.resource_kind !== currentScope.workload_kind
+      ) {
+        return;
+      }
+      if (
+        currentScope.workload_name &&
+        data.resource_name &&
+        data.resource_name !== currentScope.workload_name
+      ) {
+        return;
+      }
       // Upsert by id, scoped to the currently-visible tab.
       // - Active tab: only show non-dismissed findings.
       // - Ignored tab: only show dismissed findings.
@@ -227,8 +263,13 @@ const AdvicePanel = ({
         return [data, ...prev];
       });
     } else if (type === "advice_finding_deleted") {
+      if (data.namespace && !isNamespaceAllowed(data.namespace)) return;
       setFindings((prev) => prev.filter((f) => f.id !== data.id));
     } else if (type === "advice_scan_status") {
+      const scanNs = data.scope?.namespace || data.namespace;
+      if (scanNs && !isNamespaceAllowed(scanNs)) return;
+      const currentNs = scopeRef.current?.namespace;
+      if (scanNs && currentNs && scanNs !== currentNs) return;
       const status = data.status;
       if (status === "started") {
         activeScanIdRef.current = data.scan_id;

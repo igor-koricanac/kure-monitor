@@ -789,4 +789,114 @@ describe("AdvicePanel", () => {
       screen.queryByTestId("advice-detector-coverage-banner"),
     ).not.toBeInTheDocument();
   });
+
+  test("ignores WS advice_finding and advice_scan_status events from non-selected or unauthorized namespaces", async () => {
+    const { rerender } = render(
+      <AdvicePanel
+        canWrite={true}
+        wsEvent={null}
+        userAllowedNamespaces={["data"]}
+        isAdmin={false}
+      />,
+    );
+
+    // 1. Before any namespace is selected, incoming WS finding must be ignored
+    rerender(
+      <AdvicePanel
+        canWrite={true}
+        userAllowedNamespaces={["data"]}
+        isAdmin={false}
+        wsEvent={{
+          seq: 1,
+          type: "advice_finding",
+          data: {
+            ...sampleFinding,
+            id: 901,
+            namespace: "data",
+            title: "Pre-selection WS finding",
+          },
+        }}
+      />,
+    );
+    expect(
+      screen.queryByText("Pre-selection WS finding"),
+    ).not.toBeInTheDocument();
+
+    // 2. Pick namespace "data"
+    const nsSelect = await waitFor(() => {
+      const el = document.getElementById("advice-scope-namespace");
+      if (!el) throw new Error("namespace select not ready");
+      if (!el.querySelector('option[value="data"]')) {
+        throw new Error("namespace options not yet loaded");
+      }
+      return el;
+    });
+    fireEvent.change(nsSelect, { target: { value: "data" } });
+    await screen.findByText("Startup IO amplification");
+
+    // 3. WS finding for another namespace ("web") must be ignored
+    rerender(
+      <AdvicePanel
+        canWrite={true}
+        userAllowedNamespaces={["data"]}
+        isAdmin={false}
+        wsEvent={{
+          seq: 2,
+          type: "advice_finding",
+          data: {
+            ...sampleFinding,
+            id: 902,
+            namespace: "web",
+            title: "Other namespace WS finding",
+          },
+        }}
+      />,
+    );
+    expect(
+      screen.queryByText("Other namespace WS finding"),
+    ).not.toBeInTheDocument();
+
+    // 4. WS scan status for another namespace ("web") must not show scan banner
+    rerender(
+      <AdvicePanel
+        canWrite={true}
+        userAllowedNamespaces={["data"]}
+        isAdmin={false}
+        wsEvent={{
+          seq: 3,
+          type: "advice_scan_status",
+          data: {
+            status: "started",
+            scan_id: "s-web",
+            scope: { namespace: "web" },
+          },
+        }}
+      />,
+    );
+    expect(
+      screen.queryByText(/Advice scan in progress/i),
+    ).not.toBeInTheDocument();
+
+    // 5. WS finding for the selected & allowed namespace ("data") IS added
+    rerender(
+      <AdvicePanel
+        canWrite={true}
+        userAllowedNamespaces={["data"]}
+        isAdmin={false}
+        wsEvent={{
+          seq: 4,
+          type: "advice_finding",
+          data: {
+            ...sampleFinding,
+            id: 903,
+            namespace: "data",
+            title: "Matching namespace WS finding",
+          },
+        }}
+      />,
+    );
+    expect(
+      await screen.findByText("Matching namespace WS finding"),
+    ).toBeInTheDocument();
+  });
 });

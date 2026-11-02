@@ -158,6 +158,21 @@ def build_router(deps: RouterDeps) -> APIRouter:
     websocket_manager = deps.websocket_manager
     advice_engine = getattr(deps, "advice_engine", None)
 
+    async def _check_advice_namespace_access(request: Request, namespace: Optional[str]):
+        """Verify that a non-admin user has permission to access the finding's namespace."""
+        user = getattr(request.state, "user", None)
+        if not user or user.get("role") == "admin" or user.get("kind") == "service":
+            return
+        perms = await db.get_user_effective_permissions(user)
+        if perms.get("all_namespaces"):
+            return
+        allowed_ns = set(perms.get("namespaces", []))
+        if namespace not in allowed_ns:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied to namespace '{namespace}'",
+            )
+
     @router.post(
         "/scan",
         dependencies=[Depends(require_write)],
@@ -367,10 +382,11 @@ def build_router(deps: RouterDeps) -> APIRouter:
         return {"id": detector_id, "enabled": body.enabled}
 
     @router.get("/findings/{finding_id}")
-    async def get_advice_finding(finding_id: int):
+    async def get_advice_finding(finding_id: int, request: Request):
         row = await db.get_advice_finding_by_id(finding_id)
         if not row:
             raise HTTPException(status_code=404, detail="Advice finding not found")
+        await _check_advice_namespace_access(request, row.get("namespace"))
         return _row_to_advice_finding(row)
 
     @router.post(
@@ -379,6 +395,7 @@ def build_router(deps: RouterDeps) -> APIRouter:
     )
     async def explain_finding(
         finding_id: int,
+        request: Request,
         llm_id: Optional[int] = Query(None, description="Optional target LLM config ID"),
     ):
         """Generate (or fetch cached) LLM explanation for one finding.
@@ -388,6 +405,10 @@ def build_router(deps: RouterDeps) -> APIRouter:
         """
         if advice_engine is None:
             raise HTTPException(status_code=503, detail="Advice engine not configured")
+        existing = await db.get_advice_finding_by_id(finding_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Advice finding not found")
+        await _check_advice_namespace_access(request, existing.get("namespace"))
         row = await advice_engine.explain_finding(finding_id, llm_id=llm_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Advice finding not found")
@@ -397,10 +418,11 @@ def build_router(deps: RouterDeps) -> APIRouter:
         "/findings/{finding_id}",
         dependencies=[Depends(require_write)],
     )
-    async def dismiss_finding(finding_id: int):
+    async def dismiss_finding(finding_id: int, request: Request):
         existing = await db.get_advice_finding_by_id(finding_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Advice finding not found")
+        await _check_advice_namespace_access(request, existing.get("namespace"))
         ok = await db.dismiss_advice_finding(finding_id)
         if not ok:
             # Already dismissed; treat as a no-op success.
@@ -423,10 +445,11 @@ def build_router(deps: RouterDeps) -> APIRouter:
         "/findings/{finding_id}/restore",
         dependencies=[Depends(require_write)],
     )
-    async def restore_finding(finding_id: int):
+    async def restore_finding(finding_id: int, request: Request):
         existing = await db.get_advice_finding_by_id(finding_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Advice finding not found")
+        await _check_advice_namespace_access(request, existing.get("namespace"))
         await db.restore_advice_finding(finding_id)
         # Re-broadcast as a new finding so clients add it back to their list.
         try:

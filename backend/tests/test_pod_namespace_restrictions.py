@@ -303,3 +303,124 @@ async def test_security_findings_namespace_restrictions():
 
         r_res_allowed = await client.put("/api/security/findings/100/restore")
         assert r_res_allowed.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_advice_findings_namespace_restrictions():
+    """Advice single-finding endpoints (get, explain, dismiss, restore) and WS scan status must enforce allowed namespaces."""
+    mock_db = Mock()
+
+    advice_allowed = {
+        "id": 300,
+        "detector_id": "startup-io-amplification",
+        "severity": "high",
+        "category": "startup",
+        "title": "Startup IO amplification",
+        "summary": "Summary",
+        "resource_kind": "Deployment",
+        "resource_name": "app-a",
+        "namespace": "team-a",
+        "evidence": {},
+        "recommended_change": "Fix it",
+        "confidence": 0.9,
+        "explanation": "Explanation",
+        "dismissed": 0,
+    }
+    advice_forbidden = {
+        **advice_allowed,
+        "id": 400,
+        "resource_name": "app-b",
+        "namespace": "team-b",
+    }
+
+    async def get_advice_by_id(finding_id: int):
+        for f in (advice_allowed, advice_forbidden):
+            if f["id"] == finding_id:
+                return f
+        return None
+
+    mock_db.get_advice_finding_by_id = AsyncMock(side_effect=get_advice_by_id)
+    mock_db.dismiss_advice_finding = AsyncMock(return_value=True)
+    mock_db.restore_advice_finding = AsyncMock(return_value=True)
+
+    mock_db.get_user_effective_permissions = AsyncMock(
+        return_value={
+            "role": "member",
+            "has_team": True,
+            "access_level": "write",
+            "all_namespaces": False,
+            "namespaces": ["team-a"],
+            "tabs": ["ai_advice"],
+        }
+    )
+
+    mock_solution_engine = Mock(spec=SolutionEngine)
+    mock_solution_engine.llm_provider = None
+
+    mock_advice_engine = Mock()
+    mock_advice_engine.explain_finding = AsyncMock(return_value=advice_allowed)
+
+    ws_manager = WebSocketManager()
+
+    app = FastAPI()
+    app.state.db = mock_db
+
+    from fastapi import Request
+
+    async def fake_member_auth(request: Request):
+        user = {"id": 2, "username": "alice", "role": "member"}
+        request.state.user = user
+        return user
+
+    app.dependency_overrides[require_authenticated] = fake_member_auth
+
+    api_router = create_api_router(
+        db=mock_db,
+        solution_engine=mock_solution_engine,
+        websocket_manager=ws_manager,
+        advice_engine=mock_advice_engine,
+    )
+    app.include_router(api_router)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. GET /api/advice/findings/{id} blocked on team-b (403), allowed on team-a (200)
+        r_get_forbidden = await client.get("/api/advice/findings/400")
+        assert r_get_forbidden.status_code == 403
+
+        r_get_allowed = await client.get("/api/advice/findings/300")
+        assert r_get_allowed.status_code == 200
+        assert r_get_allowed.json()["namespace"] == "team-a"
+
+        # 2. POST /api/advice/findings/{id}/explain blocked on team-b (403), allowed on team-a (200)
+        r_exp_forbidden = await client.post("/api/advice/findings/400/explain")
+        assert r_exp_forbidden.status_code == 403
+
+        r_exp_allowed = await client.post("/api/advice/findings/300/explain")
+        assert r_exp_allowed.status_code == 200
+
+        # 3. DELETE /api/advice/findings/{id} blocked on team-b (403), allowed on team-a (200)
+        r_del_forbidden = await client.delete("/api/advice/findings/400")
+        assert r_del_forbidden.status_code == 403
+
+        r_del_allowed = await client.delete("/api/advice/findings/300")
+        assert r_del_allowed.status_code == 200
+
+        # 4. PUT /api/advice/findings/{id}/restore blocked on team-b (403), allowed on team-a (200)
+        r_res_forbidden = await client.put("/api/advice/findings/400/restore")
+        assert r_res_forbidden.status_code == 403
+
+        r_res_allowed = await client.put("/api/advice/findings/300/restore")
+        assert r_res_allowed.status_code == 200
+
+    # 5. Also verify WebSocket broadcast_advice_scan_status filters by scope.namespace
+    ws_team_a = AsyncMock()
+    ws_team_a.app = app
+    await ws_manager.connect(ws_team_a, principal={"kind": "user", "id": 2, "username": "alice", "role": "member"})
+
+    await ws_manager.broadcast_advice_scan_status("started", {"namespace": "team-b"}, "scan-b")
+    assert ws_team_a.send_text.call_count == 0
+
+    await ws_manager.broadcast_advice_scan_status("started", {"namespace": "team-a"}, "scan-a")
+    assert ws_team_a.send_text.call_count == 1
+

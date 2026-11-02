@@ -59,6 +59,11 @@ const AdvicePanel = ({
     tabRef.current = tab;
   }, [tab]);
 
+  const scopeRef = useRef(scope);
+  useEffect(() => {
+    scopeRef.current = scope;
+  }, [scope]);
+
   // Export menu state.
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -180,6 +185,24 @@ const AdvicePanel = ({
     if (!type || !data) return;
 
     if (type === "advice_finding") {
+      const currentScope = scopeRef.current;
+      if (!currentScope?.namespace || data.namespace !== currentScope.namespace) {
+        return;
+      }
+      if (
+        currentScope.workload_kind &&
+        data.resource_kind &&
+        data.resource_kind !== currentScope.workload_kind
+      ) {
+        return;
+      }
+      if (
+        currentScope.workload_name &&
+        data.resource_name &&
+        data.resource_name !== currentScope.workload_name
+      ) {
+        return;
+      }
       // Upsert by id, scoped to the currently-visible tab.
       // - Active tab: only show non-dismissed findings.
       // - Ignored tab: only show dismissed findings.
@@ -203,6 +226,9 @@ const AdvicePanel = ({
     } else if (type === "advice_finding_deleted") {
       setFindings((prev) => prev.filter((f) => f.id !== data.id));
     } else if (type === "advice_scan_status") {
+      const scanNs = data.scope?.namespace || data.namespace;
+      const currentNs = scopeRef.current?.namespace;
+      if (scanNs && currentNs && scanNs !== currentNs) return;
       const status = data.status;
       if (status === "started") {
         activeScanIdRef.current = data.scan_id;

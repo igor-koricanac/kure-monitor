@@ -233,7 +233,8 @@ const Dashboard = () => {
       message.type === 'advice_finding_deleted' ||
       message.type === 'advice_scan_status'
     ) {
-      if (message.data?.namespace && !isNamespaceAllowed(message.data.namespace)) return;
+      const eventNs = message.data?.namespace || message.data?.scope?.namespace;
+      if (eventNs && !isNamespaceAllowed(eventNs)) return;
       // Forward to AdvicePanel via a bumped sequence number so the panel's
       // useEffect re-runs on every message even if the payload repeats.
       adviceSeqRef.current += 1;
@@ -1001,6 +1002,8 @@ const Dashboard = () => {
               isDark={isDark}
               canWrite={canWrite}
               wsEvent={adviceEvent}
+              userAllowedNamespaces={user?.effective_namespaces || null}
+              isAdmin={isAdmin}
             />
           )}
 
