@@ -46,7 +46,10 @@ const Dashboard = () => {
   });
   // Separate namespace filters for each tab
   const [podNamespaceFilter, setPodNamespaceFilter] = useState('');
-  const [securityNamespaceFilter, setSecurityNamespaceFilter] = useState('');
+  const [selectedSecurityNamespaces, setSelectedSecurityNamespaces] = useState([]);
+  const [showSecurityNamespaceDropdown, setShowSecurityNamespaceDropdown] = useState(false);
+  const [securityNamespaceSearchQuery, setSecurityNamespaceSearchQuery] = useState('');
+  const [availableClusterNamespaces, setAvailableClusterNamespaces] = useState([]);
   const [selectedSeverities, setSelectedSeverities] = useState(['critical', 'high', 'medium', 'low']);
   const [showSeverityDropdown, setShowSeverityDropdown] = useState(false);
   const [selectedRules, setSelectedRules] = useState([]);
@@ -67,6 +70,7 @@ const Dashboard = () => {
   // Refs for dropdown click-outside handling
   const severityDropdownRef = useRef(null);
   const ruleDropdownRef = useRef(null);
+  const securityNamespaceDropdownRef = useRef(null);
   const exportDropdownRef = useRef(null);
 
   // Helper to show banner and reset hide timer (during active rescans)
@@ -120,6 +124,10 @@ const Dashboard = () => {
       if (ruleDropdownRef.current && !ruleDropdownRef.current.contains(event.target)) {
         setShowRuleDropdown(false);
         setRuleSearchQuery('');
+      }
+      if (securityNamespaceDropdownRef.current && !securityNamespaceDropdownRef.current.contains(event.target)) {
+        setShowSecurityNamespaceDropdown(false);
+        setSecurityNamespaceSearchQuery('');
       }
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
         setShowExportDropdown(false);
@@ -310,6 +318,23 @@ const Dashboard = () => {
     [securityFindings]
   );
 
+  // Extract all available namespaces the user has access to for the Security Scan namespace dropdown
+  const allSecurityNamespaces = useMemo(() => {
+    const nsSet = new Set();
+    securityFindings.forEach(f => {
+      if (f.namespace && isNamespaceAllowed(f.namespace)) nsSet.add(f.namespace);
+    });
+    availableClusterNamespaces.forEach(ns => {
+      if (ns && isNamespaceAllowed(ns)) nsSet.add(ns);
+    });
+    if (Array.isArray(user?.effective_namespaces)) {
+      user.effective_namespaces.forEach(ns => {
+        if (ns && ns !== '*') nsSet.add(ns);
+      });
+    }
+    return [...nsSet].sort();
+  }, [securityFindings, availableClusterNamespaces, user?.effective_namespaces, isNamespaceAllowed]);
+
   // Clean up stale rule selections when available rules change
   useEffect(() => {
     if (selectedRules.length > 0) {
@@ -320,10 +345,20 @@ const Dashboard = () => {
     }
   }, [allRuleTitles]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clean up stale namespace selections when available namespaces change
+  useEffect(() => {
+    if (selectedSecurityNamespaces.length > 0 && allSecurityNamespaces.length > 0) {
+      const validNs = selectedSecurityNamespaces.filter(ns => allSecurityNamespaces.includes(ns));
+      if (validNs.length !== selectedSecurityNamespaces.length) {
+        setSelectedSecurityNamespaces(validNs);
+      }
+    }
+  }, [allSecurityNamespaces]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Filter security findings based on security-specific namespace filter, severity, and rule
   const filteredSecurityFindings = securityFindings.filter(finding => {
-    const matchesNamespace = securityNamespaceFilter.trim() === '' ||
-      finding.namespace.toLowerCase().includes(securityNamespaceFilter.toLowerCase().trim());
+    const matchesNamespace = selectedSecurityNamespaces.length === 0 ||
+      selectedSecurityNamespaces.includes(finding.namespace);
     const matchesSeverity = selectedSeverities.includes(finding.severity.toLowerCase());
     const matchesRule = selectedRules.length === 0 || selectedRules.includes(getRuleCategory(finding.title));
     return matchesNamespace && matchesSeverity && matchesRule;
@@ -364,6 +399,17 @@ const Dashboard = () => {
     });
   };
 
+  // Toggle security namespace selection
+  const toggleSecurityNamespace = (ns) => {
+    setSelectedSecurityNamespaces(prev => {
+      if (prev.includes(ns)) {
+        return prev.filter(n => n !== ns);
+      } else {
+        return [...prev, ns];
+      }
+    });
+  };
+
   // Get severity badge color
   const getSeverityBadgeColor = (severity) => {
     switch (severity) {
@@ -383,15 +429,22 @@ const Dashboard = () => {
       try {
         if (cancelled) return;
         setLoading(true);
-        const [activePods, findings, config] = await Promise.all([
+        const [activePods, findings, config, diagNsRes] = await Promise.all([
           api.getFailedPods(),
           api.getSecurityFindings(),
-          api.getConfig()
+          api.getConfig(),
+          typeof api.getDiagramNamespaces === 'function'
+            ? api.getDiagramNamespaces().catch(() => ({ namespaces: [] }))
+            : Promise.resolve({ namespaces: [] }),
         ]);
         if (cancelled) return;
         setPods(Array.isArray(activePods) ? activePods : []);
         if (cancelled) return;
         setSecurityFindings(Array.isArray(findings) ? findings : (findings?.findings || []));
+        if (cancelled) return;
+        if (Array.isArray(diagNsRes?.namespaces)) {
+          setAvailableClusterNamespaces(diagNsRes.namespaces);
+        }
         if (cancelled) return;
         setAiEnabled(config?.ai_enabled || false);
         if (cancelled) return;
@@ -847,27 +900,106 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Namespace Filter - uses separate state per tab */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="namespace-filter" className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-              Filter by namespace:
-            </label>
-            <input
-              id="namespace-filter"
-              type="text"
-              value={activeTab === 'monitoring' ? podNamespaceFilter : securityNamespaceFilter}
-              onChange={(e) => activeTab === 'monitoring'
-                ? setPodNamespaceFilter(e.target.value)
-                : setSecurityNamespaceFilter(e.target.value)
-              }
-              placeholder="Enter namespace"
-              className={`block w-40 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                isDark
-                  ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500'
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-              }`}
-            />
-          </div>
+          {/* Namespace Filter - searchable dropdown on Security Scan tab, text input on Pod Monitoring tab */}
+          {activeTab === 'security' ? (
+            <div className="relative" ref={securityNamespaceDropdownRef}>
+              <button
+                data-testid="security-namespace-dropdown-btn"
+                onClick={() => setShowSecurityNamespaceDropdown(!showSecurityNamespaceDropdown)}
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isDark
+                    ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200'
+                    : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <Server className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+                <span>Namespace</span>
+                {selectedSecurityNamespaces.length > 0 && (
+                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    ({selectedSecurityNamespaces.length}/{allSecurityNamespaces.length})
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 transition-transform ${isDark ? 'text-gray-400' : 'text-gray-500'} ${showSecurityNamespaceDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showSecurityNamespaceDropdown && (
+                <div className={`absolute right-0 mt-2 w-64 rounded-sm shadow-lg border z-10 ${
+                  isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                    <input
+                      type="text"
+                      placeholder="Search namespaces..."
+                      value={securityNamespaceSearchQuery}
+                      onChange={(e) => setSecurityNamespaceSearchQuery(e.target.value)}
+                      className={`w-full px-2 py-1.5 text-sm rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        isDark
+                          ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400'
+                          : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    {allSecurityNamespaces
+                      .filter(ns => ns.toLowerCase().includes(securityNamespaceSearchQuery.toLowerCase().trim()))
+                      .map(ns => (
+                        <label
+                          key={ns}
+                          className={`flex items-center px-4 py-2 cursor-pointer ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSecurityNamespaces.includes(ns)}
+                            onChange={() => toggleSecurityNamespace(ns)}
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
+                          />
+                          <span className={`ml-3 text-sm truncate ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                            {ns}
+                          </span>
+                        </label>
+                      ))}
+                    {allSecurityNamespaces.filter(ns => ns.toLowerCase().includes(securityNamespaceSearchQuery.toLowerCase().trim())).length === 0 && (
+                      <div className={`px-4 py-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        No matching namespaces
+                      </div>
+                    )}
+                  </div>
+                  <div className={`border-t px-4 py-2 flex justify-between ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                    <button
+                      onClick={() => setSelectedSecurityNamespaces([...allSecurityNamespaces])}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => setSelectedSecurityNamespaces([])}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <label htmlFor="namespace-filter" className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                Filter by namespace:
+              </label>
+              <input
+                id="namespace-filter"
+                type="text"
+                value={podNamespaceFilter}
+                onChange={(e) => setPodNamespaceFilter(e.target.value)}
+                placeholder="Enter namespace"
+                className={`block w-40 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                  isDark
+                    ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                }`}
+              />
+            </div>
+          )}
         </div>
         )}
 

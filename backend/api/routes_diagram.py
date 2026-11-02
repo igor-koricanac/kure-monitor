@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from models.models import DiagramResponse
 from services.topology_service import (
     ALL_DIAGRAM_KINDS,
+    CLUSTER_NS,
     WORKLOAD_ROOT_KINDS,
     K8S_AVAILABLE,
     TopologyService,
@@ -32,6 +33,37 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
     # instance for back-compat (older tests construct deps without it).
     service = getattr(deps, "topology_service", None) or TopologyService()
 
+    async def _get_allowed_namespaces(request: Request) -> set[str] | None:
+        """Return the set of allowed namespaces for the request user, or None if unrestricted."""
+        user = getattr(request.state, "user", None)
+        if not user or user.get("role") == "admin" or user.get("kind") == "service":
+            return None
+        db = getattr(deps, "db", None)
+        if not db or not hasattr(db, "get_user_effective_permissions"):
+            return None
+        perms = await db.get_user_effective_permissions(user)
+        if perms.get("all_namespaces"):
+            return None
+        return set(perms.get("namespaces", []))
+
+    async def _check_diagram_namespace_access(request: Request, ns: str):
+        """Raise 403 if the user is restricted to specific namespaces and `ns` is not allowed."""
+        allowed_ns = await _get_allowed_namespaces(request)
+        if allowed_ns is not None and ns not in allowed_ns:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied to namespace '{ns}'",
+            )
+
+    async def _check_cluster_scope_access(request: Request):
+        """Raise 403 if the user is restricted to specific namespaces (cannot view cluster-scoped RBAC)."""
+        allowed_ns = await _get_allowed_namespaces(request)
+        if allowed_ns is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to cluster-scoped resources",
+            )
+
     @router.get("/diagram/namespaces")
     async def list_diagram_namespaces(request: Request, kind: str | None = Query(None)):
         if not K8S_AVAILABLE:
@@ -40,14 +72,9 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             )
         try:
             namespaces = await service.list_namespaces(kind=kind)
-            user = getattr(request.state, "user", None)
-            if user and user.get("role") != "admin":
-                db = getattr(deps, "db", None)
-                if db:
-                    perms = await db.get_user_effective_permissions(user)
-                    if not perms.get("all_namespaces"):
-                        allowed_ns = set(perms.get("namespaces", []))
-                        namespaces = [ns for ns in namespaces if ns in allowed_ns]
+            allowed_ns = await _get_allowed_namespaces(request)
+            if allowed_ns is not None:
+                namespaces = [ns for ns in namespaces if ns in allowed_ns]
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except RuntimeError as e:
@@ -63,18 +90,7 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
-        user = getattr(request.state, "user", None)
-        if user and user.get("role") != "admin":
-            db = getattr(deps, "db", None)
-            if db:
-                perms = await db.get_user_effective_permissions(user)
-                if not perms.get("all_namespaces"):
-                    allowed_ns = set(perms.get("namespaces", []))
-                    if ns not in allowed_ns:
-                        raise HTTPException(
-                            status_code=403,
-                            detail=f"Access denied to namespace '{ns}'",
-                        )
+        await _check_diagram_namespace_access(request, ns)
         try:
             return await service.get_namespace_diagram(ns)
         except RuntimeError as e:
@@ -84,11 +100,12 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/diagram/workloads/{ns}/{kind}")
-    async def list_workloads(ns: str, kind: str):
+    async def list_workloads(ns: str, kind: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
+        await _check_diagram_namespace_access(request, ns)
         normalised = normalise_kind(kind)
         if normalised not in WORKLOAD_ROOT_KINDS:
             raise HTTPException(
@@ -110,11 +127,12 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
         return {"workloads": names}
 
     @router.get("/diagram/workload/{ns}/{kind}/{name}", response_model=DiagramResponse)
-    async def get_workload_diagram(ns: str, kind: str, name: str):
+    async def get_workload_diagram(ns: str, kind: str, name: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
+        await _check_diagram_namespace_access(request, ns)
         normalised = normalise_kind(kind)
         if normalised not in WORKLOAD_ROOT_KINDS:
             raise HTTPException(
@@ -148,7 +166,7 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/diagram/manifest/{ns}/{kind}/{name}")
-    async def get_diagram_manifest(ns: str, kind: str, name: str):
+    async def get_diagram_manifest(ns: str, kind: str, name: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
@@ -168,6 +186,11 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
                     "The diagram references Secrets via workload spec only."
                 ),
             )
+
+        if normalised in ("ClusterRole", "ClusterRoleBinding") or ns == CLUSTER_NS:
+            await _check_cluster_scope_access(request)
+        else:
+            await _check_diagram_namespace_access(request, ns)
 
         try:
             manifest_yaml = await service.get_manifest_yaml(ns, normalised, name)
@@ -201,13 +224,24 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
     # -- RBAC ---------------------------------------------------------------
 
     @router.get("/diagram/roles")
-    async def list_diagram_roles():
+    async def list_diagram_roles(request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
         try:
-            return await service.list_roles()
+            res = await service.list_roles()
+            allowed_ns = await _get_allowed_namespaces(request)
+            if allowed_ns is not None:
+                res = {
+                    "cluster_roles": [],
+                    "roles": [
+                        r
+                        for r in res.get("roles", [])
+                        if r.get("namespace") in allowed_ns
+                    ],
+                }
+            return res
         except RuntimeError as e:
             raise HTTPException(status_code=503, detail=str(e))
         except Exception as e:
@@ -215,11 +249,12 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/diagram/role/{namespace}/{name}", response_model=DiagramResponse)
-    async def get_role_diagram(namespace: str, name: str):
+    async def get_role_diagram(namespace: str, name: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
+        await _check_diagram_namespace_access(request, namespace)
         try:
             return await service.get_role_diagram(namespace, name)
         except RuntimeError as e:
@@ -239,11 +274,12 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.get("/diagram/clusterrole/{name}", response_model=DiagramResponse)
-    async def get_cluster_role_diagram(name: str):
+    async def get_cluster_role_diagram(name: str, request: Request):
         if not K8S_AVAILABLE:
             raise HTTPException(
                 status_code=503, detail="Kubernetes client not available"
             )
+        await _check_cluster_scope_access(request)
         try:
             return await service.get_cluster_role_diagram(name)
         except RuntimeError as e:

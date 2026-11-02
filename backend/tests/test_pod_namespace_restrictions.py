@@ -424,3 +424,123 @@ async def test_advice_findings_namespace_restrictions():
     await ws_manager.broadcast_advice_scan_status("started", {"namespace": "team-a"}, "scan-a")
     assert ws_team_a.send_text.call_count == 1
 
+
+@pytest.mark.asyncio
+async def test_diagram_namespace_restrictions():
+    """Diagram endpoints (workloads, workload diagram, manifest, roles, role diagram, clusterrole) must enforce allowed namespaces."""
+    from models.models import DiagramResponse
+
+    mock_db = Mock()
+    mock_db.get_user_effective_permissions = AsyncMock(
+        return_value={
+            "role": "member",
+            "has_team": True,
+            "access_level": "read",
+            "all_namespaces": False,
+            "namespaces": ["team-a"],
+            "tabs": ["diagram"],
+        }
+    )
+
+    mock_topology = Mock()
+    mock_topology.list_namespaces = AsyncMock(return_value=["team-a", "team-b"])
+    mock_topology.list_workloads = AsyncMock(return_value=["app-1"])
+    mock_topology.get_namespace_diagram = AsyncMock(
+        side_effect=lambda ns: DiagramResponse(scope="namespace", root_id=ns, nodes=[], edges=[], groups=[])
+    )
+    mock_topology.get_workload_diagram = AsyncMock(
+        side_effect=lambda ns, kind, name: DiagramResponse(
+            scope="workload", root_id=f"{kind}/{ns}/{name}", nodes=[], edges=[], groups=[]
+        )
+    )
+    mock_topology.get_manifest_yaml = AsyncMock(return_value="apiVersion: v1\nkind: Pod")
+    mock_topology.list_roles = AsyncMock(
+        return_value={
+            "cluster_roles": [{"name": "custom-cluster-role"}],
+            "roles": [
+                {"namespace": "team-a", "name": "role-a"},
+                {"namespace": "team-b", "name": "role-b"},
+            ],
+        }
+    )
+    mock_topology.get_role_diagram = AsyncMock(
+        side_effect=lambda ns, name: DiagramResponse(
+            scope="role", root_id=f"Role/{ns}/{name}", nodes=[], edges=[], groups=[]
+        )
+    )
+    mock_topology.get_cluster_role_diagram = AsyncMock(
+        side_effect=lambda name: DiagramResponse(
+            scope="clusterrole", root_id=f"ClusterRole/--/{name}", nodes=[], edges=[], groups=[]
+        )
+    )
+
+    mock_solution_engine = Mock(spec=SolutionEngine)
+    mock_solution_engine.llm_provider = None
+    ws_manager = WebSocketManager()
+
+    app = FastAPI()
+    app.state.db = mock_db
+
+    from fastapi import Request
+
+    async def fake_member_auth(request: Request):
+        user = {"id": 2, "username": "alice", "role": "member"}
+        request.state.user = user
+        return user
+
+    app.dependency_overrides[require_authenticated] = fake_member_auth
+
+    api_router = create_api_router(
+        db=mock_db,
+        solution_engine=mock_solution_engine,
+        websocket_manager=ws_manager,
+        topology_service=mock_topology,
+    )
+    app.include_router(api_router)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. GET /api/diagram/workloads/{ns}/{kind}
+        r_wl_forbidden = await client.get("/api/diagram/workloads/team-b/Deployment")
+        assert r_wl_forbidden.status_code == 403
+
+        r_wl_allowed = await client.get("/api/diagram/workloads/team-a/Deployment")
+        assert r_wl_allowed.status_code == 200
+        assert r_wl_allowed.json()["workloads"] == ["app-1"]
+
+        # 2. GET /api/diagram/workload/{ns}/{kind}/{name}
+        r_wld_forbidden = await client.get("/api/diagram/workload/team-b/Deployment/app-1")
+        assert r_wld_forbidden.status_code == 403
+
+        r_wld_allowed = await client.get("/api/diagram/workload/team-a/Deployment/app-1")
+        assert r_wld_allowed.status_code == 200
+
+        # 3. GET /api/diagram/manifest/{ns}/{kind}/{name}
+        r_man_forbidden = await client.get("/api/diagram/manifest/team-b/Deployment/app-1")
+        assert r_man_forbidden.status_code == 403
+
+        r_man_cluster_forbidden = await client.get("/api/diagram/manifest/--/ClusterRole/custom-cluster-role")
+        assert r_man_cluster_forbidden.status_code == 403
+
+        r_man_allowed = await client.get("/api/diagram/manifest/team-a/Deployment/app-1")
+        assert r_man_allowed.status_code == 200
+
+        # 4. GET /api/diagram/roles filters to allowed namespaces and hides ClusterRoles
+        r_roles = await client.get("/api/diagram/roles")
+        assert r_roles.status_code == 200
+        roles_payload = r_roles.json()
+        assert roles_payload["cluster_roles"] == []
+        assert roles_payload["roles"] == [{"namespace": "team-a", "name": "role-a"}]
+
+        # 5. GET /api/diagram/role/{namespace}/{name}
+        r_role_forbidden = await client.get("/api/diagram/role/team-b/role-b")
+        assert r_role_forbidden.status_code == 403
+
+        r_role_allowed = await client.get("/api/diagram/role/team-a/role-a")
+        assert r_role_allowed.status_code == 200
+
+        # 6. GET /api/diagram/clusterrole/{name} blocked for namespace-restricted user
+        r_cr_forbidden = await client.get("/api/diagram/clusterrole/custom-cluster-role")
+        assert r_cr_forbidden.status_code == 403
+
+

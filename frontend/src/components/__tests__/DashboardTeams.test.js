@@ -230,4 +230,75 @@ describe('Dashboard Team Permissions and Empty State', () => {
 
     expect(screen.getByText(/allowed-pod-sec/)).toBeInTheDocument();
   });
+
+  test('renders searchable Namespace dropdown in Security Scan tab showing allowed namespaces and filtering findings', async () => {
+    const { fireEvent } = require('@testing-library/react');
+
+    api.getSecurityFindings.mockResolvedValue([
+      {
+        id: 301,
+        resource_type: 'Pod',
+        resource_name: 'alpha-pod',
+        namespace: 'team-alpha-ns',
+        severity: 'high',
+        category: 'Security',
+        title: 'Privileged container',
+        description: 'Runs privileged',
+        remediation: 'Disable privileged',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 302,
+        resource_type: 'Pod',
+        resource_name: 'gamma-pod',
+        namespace: 'team-gamma-ns',
+        severity: 'medium',
+        category: 'Security',
+        title: 'Root container',
+        description: 'Runs as root',
+        remediation: 'Set runAsNonRoot',
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+
+    useAuth.mockReturnValue({
+      user: {
+        id: 2,
+        username: 'alice',
+        role: 'member',
+        has_team: true,
+        all_namespaces: false,
+        effective_namespaces: ['team-alpha-ns', 'team-gamma-ns', 'empty-allowed-ns'],
+        effective_access_level: 'read',
+        effective_tabs: ['security_scanner'],
+      },
+      userRole: 'member',
+      logout: jest.fn(),
+    });
+
+    render(<Dashboard />);
+    expect(await screen.findByText(/alpha-pod/)).toBeInTheDocument();
+    expect(screen.getByText(/gamma-pod/)).toBeInTheDocument();
+
+    // Open the Namespace dropdown
+    const dropdownBtn = screen.getByTestId('security-namespace-dropdown-btn');
+    fireEvent.click(dropdownBtn);
+
+    // Search input and all allowed namespaces (including empty-allowed-ns) should be listed
+    const searchInput = screen.getByPlaceholderText('Search namespaces...');
+    expect(searchInput).toBeInTheDocument();
+    expect(screen.getByLabelText('team-alpha-ns')).toBeInTheDocument();
+    expect(screen.getByLabelText('team-gamma-ns')).toBeInTheDocument();
+    expect(screen.getByLabelText('empty-allowed-ns')).toBeInTheDocument();
+
+    // Search for "alpha" in the dropdown search box
+    fireEvent.change(searchInput, { target: { value: 'alpha' } });
+    expect(screen.getByLabelText('team-alpha-ns')).toBeInTheDocument();
+    expect(screen.queryByLabelText('team-gamma-ns')).not.toBeInTheDocument();
+
+    // Select team-alpha-ns -> gamma-pod should be filtered out
+    fireEvent.click(screen.getByLabelText('team-alpha-ns'));
+    expect(screen.getByText(/alpha-pod/)).toBeInTheDocument();
+    expect(screen.queryByText(/gamma-pod/)).not.toBeInTheDocument();
+  });
 });
