@@ -5,13 +5,24 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] - 2026-11-05
+
+Headline changes:
+- **Multi-Tenant Namespace Isolation Across All Tabs (KAN-102, KAN-103, KAN-104, KAN-106)**: Hardened backend API authorization and real-time WebSocket event filtering for team-scoped users across Pod Monitoring, Security Scanner, AI Advice, and Topology Diagram tabs.
+  - **Pod Monitoring (KAN-102)**: Enforced namespace permission checks on pod detail, manifest, node detail, live log streaming, and AI troubleshooting endpoints. Scoped WebSocket broadcasts (`pod_failure`, `pod_update`, `pod_resolved`, `solution_generated`) so restricted users only receive events for their allowed namespaces.
+  - **Security Scanner (KAN-103)**: Enforced finding-level namespace access checks on manifest retrieval, AI fix generation, dismissal, and restoration endpoints, plus client-side WebSocket event filtering.
+  - **AI Advice (KAN-104)**: Enforced finding-level namespace access checks on detail, AI explain, dismissal, and restoration endpoints. Scoped `advice_scan_status` WebSocket broadcasts by scan namespace and filtered real-time `advice_finding` and `advice_finding_deleted` events in the UI.
+  - **Topology Diagram (KAN-106)**: Enforced namespace access checks on direct workload and manifest API endpoints (`GET /api/diagram/workloads/{ns}/{kind}`, `workload/{ns}/{kind}/{name}`, `manifest/{ns}/{kind}/{name}`) and RBAC role endpoints (`GET /api/diagram/roles`, `role/{namespace}/{name}`). Restricted cluster-wide `ClusterRole` inspection (`GET /api/diagram/clusterrole/{name}`) for namespace-scoped users.
+- **Searchable Namespace Dropdown in Security Scanner (KAN-106)**: Replaced the plain-text namespace filter input in the Security Scan tab with a searchable multi-select dropdown showing all accessible namespaces with `Select All` and `Clear All` controls.
+- **Simplified Pod Lifecycle & Retention Removal (KAN-102, KAN-103)**: Removed legacy pod failure history, ignored-pod states, mirror-pod TTL settings, and data retention background jobs to keep pod monitoring focused on active real-time cluster state.
+
 ## [2.6.0] - 2026-10-15
 
 Headline changes:
 - **Teams & Granular Multi-Tenant RBAC (KAN-93)**: Multi-tenant team access control. Cluster admins can create teams, scope member access to specific namespaces (with live cluster namespace discovery) or all namespaces, assign allowed dashboard tabs (`pod_monitoring`, `security_scanner`, `diagram`, `ai_advice`), and set `read` vs `write` operational permissions.
 - **Pod Monitoring Views: Failing Pods & Live Pods (KAN-94)**: Split Pod Monitoring into dedicated "Failing pods" and "Live Pods" views. The Live Pods view inventories all cluster pods in real time (Ready count, Status, Restarts, Age, Node) with namespace filtering.
 - **Interactive Live Log Streaming (KAN-94)**: Added interactive live log streaming with Play/Pause controls. Users can stream real-time logs via Server-Sent Events (SSE) directly from either failing pods or healthy live pods, switch containers seamlessly, and download logs for offline analysis.
-- **Keycloak Enterprise SSO (KAN-96)**: OpenID Connect (OIDC) single sign-on support configured via Helm chart values or dynamically via the Admin UI. Includes optional group-based access gating (`allowed_groups`), automatic admin role/group mapping (`admin_role`, `admin_group`), and secure `clientSecret` injection via existing Kubernetes Secrets (`existingSecret`, `existingSecretKey`).](``)
+- **Keycloak Enterprise SSO (KAN-96)**: OpenID Connect (OIDC) single sign-on support configured via Helm chart values or dynamically via the Admin UI. Includes optional group-based access gating (`allowed_groups`), automatic admin role/group mapping (`admin_role`, `admin_group`), and secure `clientSecret` injection via existing Kubernetes Secrets (`existingSecret`, `existingSecretKey`).
 
 ## [2.5.0] - 2026-09-09
 

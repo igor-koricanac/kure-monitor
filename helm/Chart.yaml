@@ -3,8 +3,8 @@ name: kure
 description: Kubernetes AI observability platform with proactive AI Advice, security scanning, topology diagrams, and pod failure diagnosis.
 type: application
 kubeVersion: ">=1.20.0-0"
-version: 2.6.0
-appVersion: "2.6.0"
+version: 2.6.1
+appVersion: "2.6.1"
 icon: "https://raw.githubusercontent.com/igor-koricanac/kure-monitor/main/docs/images/kure_monitor_logo_white_background.svg"
 keywords:
   - kubernetes
@@ -22,18 +22,14 @@ maintainers:
   - name: igor-koricanac
     email: igor.koricanac@gmail.com
 annotations:
-  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/containsSecurityUpdates: "true"
   artifacthub.io/changes: |
+    - kind: security
+      description: "Multi-Tenant Namespace Isolation: Enforced team namespace access control across all REST endpoints and WebSocket streams for Pod Monitoring, Security Scanner, AI Advice, and Topology Diagram."
     - kind: added
-      description: "Teams & Granular Multi-Tenant RBAC: Multi-tenant team access control scoped by namespace, tabs, and permissions."
-    - kind: added
-      description: "Pod Monitoring Live Pods View: Real-time inventory of all cluster pods alongside failing pods."
-    - kind: added
-      description: "Interactive Live Log Streaming: Stream real-time container logs with play/pause and download controls."
-    - kind: added
-      description: "Keycloak Enterprise SSO: OpenID Connect single sign-on support via UI and Helm values with group gating."
-    - kind: changed
-      description: "Configurable Init Containers: Support custom init container images via global.initImage, agent.initImage, and securityScanner.initImage."
+      description: "Security Scanner Namespace Dropdown: Added searchable multi-select namespace filter dropdown to the Security Scan tab."
+    - kind: removed
+      description: "Simplified Pod Lifecycle: Removed legacy pod failure history, ignored-pod states, and retention background settings."
   artifacthub.io/category: monitoring-logging
   artifacthub.io/displayName: Kure - Kubernetes Failure Diagnosis
   artifacthub.io/license: Apache-2.0
@@ -53,7 +49,7 @@ annotations:
     helm repo add kure-monitor https://kuremonitor.com/
 
     # Install Kure Monitor
-    helm install kure-monitor kure-monitor/kure --version 2.6.0 \
+    helm install kure-monitor kure-monitor/kure --version 2.6.1 \
       --create-namespace --namespace kure-system \
       --set postgresql.password="$(openssl rand -hex 24)"
 

@@ -1,26 +1,26 @@
-version: 2.6.0
+version: 2.6.1
 name: kure
 category: monitoring-logging
 displayName: Kure - Kubernetes Failure Diagnosis
-createdAt: 2026-10-15T00:00:00Z
+createdAt: 2026-11-05T00:00:00Z
 description: |
   Kubernetes AI observability platform. Instantly detect and debug pod failures (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), proactively scan your entire cluster with the AI Advice engine, visualize workloads with an interactive topology Diagram, and audit your configurations with a built-in Security Scanner.
 license: Apache-2.0
 homeURL: https://kuremonitor.com
-appVersion: "2.6.0"
+appVersion: "2.6.1"
 containersImages:
   - name: agent
-    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.6.0
+    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.6.1
   - name: backend
-    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.6.0
+    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.6.1
   - name: frontend
-    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.6.0
+    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.6.1
   - name: security-scanner
-    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.6.0
+    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.6.1
 operator: false
 deprecated: false
 prerelease: false
-containsSecurityUpdates: false
+containsSecurityUpdates: true
 keywords:
   - kubernetes
   - troubleshooting
@@ -41,20 +41,16 @@ maintainers:
 provider:
   name: igor-koricanac
 changes:
+  - kind: security
+    description: "Multi-Tenant Namespace Isolation: Enforced team namespace access control across all REST endpoints and WebSocket streams for Pod Monitoring, Security Scanner, AI Advice, and Topology Diagram."
   - kind: added
-    description: "Teams & Granular Multi-Tenant RBAC: Multi-tenant team access control scoped by namespace, tabs, and permissions."
-  - kind: added
-    description: "Pod Monitoring Live Pods View: Real-time inventory of all cluster pods alongside failing pods."
-  - kind: added
-    description: "Interactive Live Log Streaming: Stream real-time container logs with play/pause and download controls."
-  - kind: added
-    description: "Keycloak Enterprise SSO: OpenID Connect single sign-on support via UI and Helm values with group gating."
-  - kind: changed
-    description: "Configurable Init Containers: Support custom init container images via global.initImage, agent.initImage, and securityScanner.initImage."
+    description: "Security Scanner Namespace Dropdown: Added searchable multi-select namespace filter dropdown to the Security Scan tab."
+  - kind: removed
+    description: "Simplified Pod Lifecycle: Removed legacy pod failure history, ignored-pod states, and retention background settings."
 install: |
   helm repo add kure-monitor https://kuremonitor.com/
 
-  helm install kure-monitor kure-monitor/kure --version 2.6.0 \
+  helm install kure-monitor kure-monitor/kure --version 2.6.1 \
     --create-namespace --namespace kure-system \
     --set postgresql.password="$(openssl rand -hex 24)"
 

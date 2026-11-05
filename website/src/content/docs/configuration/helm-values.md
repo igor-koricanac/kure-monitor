@@ -37,7 +37,7 @@ The agent runs as a DaemonSet (one pod per node) and watches the Kubernetes API 
 |-----------|-------------|---------|
 | `agent.pendingGracePeriod` | Seconds before pending pods are flagged | `120` |
 | `agent.image.repository` | Agent image repository | `ghcr.io/igor-koricanac/kure-monitor/agent` |
-| `agent.image.tag` | Agent image tag | `2.6.0` |
+| `agent.image.tag` | Agent image tag | `2.6.1` |
 | `agent.initImage.repository` | Agent init container image override | `""` (falls back to `global.initImage`) |
 | `agent.initImage.tag` | Agent init container tag override | `""` |
 | `agent.resources.requests.cpu` | CPU request | `100m` |
@@ -51,7 +51,7 @@ Deployed only when `features.securityScan=true`.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `securityScanner.image.tag` | Scanner image tag | `2.6.0` |
+| `securityScanner.image.tag` | Scanner image tag | `2.6.1` |
 | `securityScanner.initImage.repository` | Scanner init container image override | `""` (falls back to `global.initImage`) |
 | `securityScanner.initImage.tag` | Scanner init container tag override | `""` |
 | `securityScanner.resources.requests.cpu` | CPU request | `100m` |
@@ -62,7 +62,7 @@ Deployed only when `features.securityScan=true`.
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `backend.replicaCount` | Number of replicas | `1` |
-| `backend.image.tag` | Backend image tag | `2.6.0` |
+| `backend.image.tag` | Backend image tag | `2.6.1` |
 | `backend.service.type` | Service type | `ClusterIP` |
 | `backend.service.port` | Service port | `8000` |
 | `backend.resources.requests.cpu` | CPU request | `200m` |
@@ -75,7 +75,7 @@ Deployed only when `features.securityScan=true`.
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `frontend.replicaCount` | Number of replicas | `1` |
-| `frontend.image.tag` | Frontend image tag | `2.6.0` |
+| `frontend.image.tag` | Frontend image tag | `2.6.1` |
 | `frontend.service.type` | Service type | `ClusterIP` |
 | `frontend.service.port` | Service port | `8080` |
 | `frontend.service.nodePort` | NodePort (if `type=NodePort`) | `""` |
