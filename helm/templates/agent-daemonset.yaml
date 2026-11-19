@@ -53,6 +53,10 @@ spec:
         image: "{{ .Values.global.imageRegistry }}{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
         imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
         env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: BACKEND_URL
           value: "http://{{ include "kure.fullname" . }}-backend:{{ .Values.backend.service.port }}"
         - name: PYTHONUNBUFFERED

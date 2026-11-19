@@ -5,6 +5,14 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.2] - 2026-11-19
+
+Headline changes:
+- **Fast `/api/pods/failed` Query on Large Clusters**: Rewrote `get_pod_failures()` to push the active status filter (`status IN ('new', 'investigating')`) inside the `DISTINCT ON (pod_name, namespace)` subquery and moved the `pod_failure_logs` `EXISTS` check to the outer query. Added composite (`idx_pod_failures_pod_ns_created`) and partial (`idx_pod_failures_active_status`) PostgreSQL indexes so dashboard loads scan only active failing pods instead of full historical tables, eliminating 60s `asyncpg` timeouts (`500` errors) on large clusters.
+- **Node-Scoped DaemonSet Agent & Deduplication**: Injected `NODE_NAME` via the Kubernetes Downward API (`spec.nodeName`) into `kure-agent` so each DaemonSet pod only monitors workloads scheduled on its own node (plus unscheduled `Pending` pods), eliminating N× duplicate reporting across multi-node clusters. Added a PostgreSQL transaction-scoped advisory lock (`pg_advisory_xact_lock`) in `save_pod_failure()` to prevent concurrent duplicate inserts.
+- **Automatic Resolved Pod Cleanup**: Added a lightweight background task in the backend (`prune_resolved_pod_failures`) that deletes `resolved` rows older than 24 hours on startup and every hour to prevent unbounded `pod_failures` table growth.
+- **Improved Error Logging**: Updated `/api/pods/failed` error logging to include exception class names and stack traces so `asyncio.TimeoutError` and similar errors are never logged as blank strings.
+
 ## [2.6.1] - 2026-11-05
 
 Headline changes:

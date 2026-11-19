@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from kubernetes import client, config
@@ -40,6 +41,9 @@ class PodMonitor:
 
     def __init__(self):
         self.config = Config()
+        self.node_name = os.getenv("NODE_NAME", "").strip()
+        if self.node_name:
+            logger.info(f"Node-scoped monitoring enabled for node: {self.node_name}")
         self.backend_client = BackendClient(self.config.backend_url)
         self.websocket_client = WebSocketClient(self.config.backend_url)
         self.data_collector = DataCollector(self.config)
@@ -235,6 +239,13 @@ class PodMonitor:
             current_pods = set()
             current_pods_map = {}
             for pod in pods.items:
+                pod_node = pod.spec.node_name if pod.spec else None
+                # In DaemonSet mode (NODE_NAME set), each agent only reports pods
+                # scheduled on its own node (plus unscheduled Pending pods, which
+                # the backend deduplicates via advisory lock).
+                if self.node_name and pod_node and pod_node != self.node_name:
+                    continue
+
                 pod_key = f"{pod.metadata.namespace}/{pod.metadata.name}"
                 current_pods.add(pod_key)
                 current_pods_map[pod_key] = pod

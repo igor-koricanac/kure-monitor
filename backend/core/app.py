@@ -64,9 +64,34 @@ def create_app() -> FastAPI:
         # Start mirror pod cleanup task
         await mirror_service.start_cleanup_task()
 
+        # Periodically prune resolved pod failures (>24h old) to prevent unbounded table growth
+        async def _prune_resolved_loop():
+            import asyncio
+            while True:
+                try:
+                    deleted = await db.prune_resolved_pod_failures(max_age_hours=24)
+                    if deleted:
+                        logger.info(f"Pruned {deleted} resolved pod_failures older than 24h")
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to prune resolved pod_failures: {e}")
+                try:
+                    await asyncio.sleep(3600)
+                except asyncio.CancelledError:
+                    break
+
+        import asyncio
+        prune_task = asyncio.create_task(_prune_resolved_loop())
+
         yield
 
         # Shutdown
+        prune_task.cancel()
+        try:
+            await prune_task
+        except asyncio.CancelledError:
+            pass
         await mirror_service.stop_cleanup_task()
         # Close shared aiohttp sessions held by long-lived services.
         try:
@@ -80,7 +105,7 @@ def create_app() -> FastAPI:
         await db.close()
 
     # Create FastAPI app
-    app = FastAPI(title="Kure Backend", version="2.6.1", lifespan=lifespan)
+    app = FastAPI(title="Kure Backend", version="2.6.2", lifespan=lifespan)
 
     # Configure middleware and exception handlers
     configure_cors(app)

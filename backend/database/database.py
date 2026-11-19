@@ -62,6 +62,10 @@ class Database:
         """Returns list of auto-resolved PodFailureResponse objects"""
         return await self._db.dismiss_deleted_pod(namespace, pod_name)
 
+    async def prune_resolved_pod_failures(self, max_age_hours: int = 24):
+        """Delete resolved pod failure rows older than max_age_hours"""
+        return await self._db.prune_resolved_pod_failures(max_age_hours)
+
     async def save_security_finding(self, finding):
         return await self._db.save_security_finding(finding)
 

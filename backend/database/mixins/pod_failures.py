@@ -68,90 +68,97 @@ class PodFailureMixin:
     async def save_pod_failure(self, failure: PodFailureResponse) -> int:
         """Save a pod failure to database, updating existing record if pod already exists"""
         async with self._acquire() as conn:
-            existing = await conn.fetchrow(
-                """
-                SELECT id FROM pod_failures
-                WHERE pod_name = $1 AND namespace = $2 AND status IN ('new', 'investigating')
-                ORDER BY created_at DESC LIMIT 1
-            """,
-                failure.pod_name,
-                failure.namespace,
-            )
-
-            logger.info(
-                f"Original timestamps - creation: {failure.creation_timestamp} (type: {type(failure.creation_timestamp)}), timestamp: {failure.timestamp} (type: {type(failure.timestamp)})"
-            )
-            creation_timestamp = self._normalize_timestamp(failure.creation_timestamp)
-            timestamp = self._normalize_timestamp(failure.timestamp)
-            logger.info(
-                f"Normalized timestamps - creation: {creation_timestamp} (tzinfo: {creation_timestamp.tzinfo}), timestamp: {timestamp} (tzinfo: {timestamp.tzinfo})"
-            )
-
-            container_statuses = json.dumps(
-                [status.model_dump() for status in failure.container_statuses]
-            )
-            events = json.dumps([event.model_dump() for event in failure.events])
-            # NOT NULL column in schema; store empty string when caller passes None
-            solution_value = failure.solution if failure.solution is not None else ""
-            auto_solution_mode = (
-                getattr(failure, "auto_solution_mode", "quick") or "quick"
-            )
-
-            if existing:
-                failure.is_new_failure = False
+            async with conn.transaction():
+                # Serialize concurrent reports for the same pod across DaemonSet agents
                 await conn.execute(
-                    """
-                    UPDATE pod_failures SET
-                        node_name = $1, phase = $2, creation_timestamp = $3,
-                        failure_reason = $4, failure_message = $5, container_statuses = $6,
-                        events = $7, logs = $8, manifest = $9, solution = $10, timestamp = $11,
-                        auto_solution_mode = $12,
-                        created_at = CURRENT_TIMESTAMP
-                    WHERE id = $13
-                """,
-                    failure.node_name,
-                    failure.phase,
-                    creation_timestamp,
-                    failure.failure_reason,
-                    failure.failure_message,
-                    container_statuses,
-                    events,
-                    failure.logs,
-                    failure.manifest,
-                    solution_value,
-                    timestamp,
-                    auto_solution_mode,
-                    existing["id"],
+                    "SELECT pg_advisory_xact_lock(hashtext($1 || '/' || $2))",
+                    failure.namespace,
+                    failure.pod_name,
                 )
-                return existing["id"]
-            else:
-                failure.is_new_failure = True
-                result = await conn.fetchrow(
+                existing = await conn.fetchrow(
                     """
-                    INSERT INTO pod_failures (
-                        pod_name, namespace, node_name, phase, creation_timestamp,
-                        failure_reason, failure_message, container_statuses, events,
-                        logs, manifest, solution, timestamp, dismissed, auto_solution_mode
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                    RETURNING id
+                    SELECT id FROM pod_failures
+                    WHERE pod_name = $1 AND namespace = $2 AND status IN ('new', 'investigating')
+                    ORDER BY created_at DESC LIMIT 1
                 """,
                     failure.pod_name,
                     failure.namespace,
-                    failure.node_name,
-                    failure.phase,
-                    creation_timestamp,
-                    failure.failure_reason,
-                    failure.failure_message,
-                    container_statuses,
-                    events,
-                    failure.logs,
-                    failure.manifest,
-                    solution_value,
-                    timestamp,
-                    failure.dismissed,
-                    auto_solution_mode,
                 )
-                return result["id"]
+
+                logger.info(
+                    f"Original timestamps - creation: {failure.creation_timestamp} (type: {type(failure.creation_timestamp)}), timestamp: {failure.timestamp} (type: {type(failure.timestamp)})"
+                )
+                creation_timestamp = self._normalize_timestamp(failure.creation_timestamp)
+                timestamp = self._normalize_timestamp(failure.timestamp)
+                logger.info(
+                    f"Normalized timestamps - creation: {creation_timestamp} (tzinfo: {creation_timestamp.tzinfo}), timestamp: {timestamp} (tzinfo: {timestamp.tzinfo})"
+                )
+
+                container_statuses = json.dumps(
+                    [status.model_dump() for status in failure.container_statuses]
+                )
+                events = json.dumps([event.model_dump() for event in failure.events])
+                # NOT NULL column in schema; store empty string when caller passes None
+                solution_value = failure.solution if failure.solution is not None else ""
+                auto_solution_mode = (
+                    getattr(failure, "auto_solution_mode", "quick") or "quick"
+                )
+
+                if existing:
+                    failure.is_new_failure = False
+                    await conn.execute(
+                        """
+                        UPDATE pod_failures SET
+                            node_name = $1, phase = $2, creation_timestamp = $3,
+                            failure_reason = $4, failure_message = $5, container_statuses = $6,
+                            events = $7, logs = $8, manifest = $9, solution = $10, timestamp = $11,
+                            auto_solution_mode = $12,
+                            created_at = CURRENT_TIMESTAMP
+                        WHERE id = $13
+                    """,
+                        failure.node_name,
+                        failure.phase,
+                        creation_timestamp,
+                        failure.failure_reason,
+                        failure.failure_message,
+                        container_statuses,
+                        events,
+                        failure.logs,
+                        failure.manifest,
+                        solution_value,
+                        timestamp,
+                        auto_solution_mode,
+                        existing["id"],
+                    )
+                    return existing["id"]
+                else:
+                    failure.is_new_failure = True
+                    result = await conn.fetchrow(
+                        """
+                        INSERT INTO pod_failures (
+                            pod_name, namespace, node_name, phase, creation_timestamp,
+                            failure_reason, failure_message, container_statuses, events,
+                            logs, manifest, solution, timestamp, dismissed, auto_solution_mode
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                        RETURNING id
+                    """,
+                        failure.pod_name,
+                        failure.namespace,
+                        failure.node_name,
+                        failure.phase,
+                        creation_timestamp,
+                        failure.failure_reason,
+                        failure.failure_message,
+                        container_statuses,
+                        events,
+                        failure.logs,
+                        failure.manifest,
+                        solution_value,
+                        timestamp,
+                        failure.dismissed,
+                        auto_solution_mode,
+                    )
+                    return result["id"]
 
     async def get_pod_failures(
         self,
@@ -161,7 +168,18 @@ class PodFailureMixin:
     ) -> List[PodFailureResponse]:
         """Get all pod failures from database (latest per pod)"""
         async with self._acquire() as conn:
-            query = """
+            params = []
+            inner_where = ""
+            if status_filter:
+                placeholders = ", ".join(f"${i+1}" for i in range(len(status_filter)))
+                inner_where = f"WHERE status IN ({placeholders})"
+                params = list(status_filter)
+            elif dismissed_only:
+                inner_where = "WHERE status = 'ignored'"
+            elif not include_dismissed:
+                inner_where = "WHERE status IN ('new', 'investigating')"
+
+            query = f"""
                 SELECT latest.*,
                        EXISTS(
                            SELECT 1 FROM pod_failure_logs pfl
@@ -170,22 +188,11 @@ class PodFailureMixin:
                 FROM (
                     SELECT DISTINCT ON (pod_name, namespace) *
                     FROM pod_failures
+                    {inner_where}
                     ORDER BY pod_name, namespace, created_at DESC
                 ) latest
-                WHERE TRUE
+                ORDER BY latest.created_at DESC
             """
-
-            params = []
-            if status_filter:
-                placeholders = ", ".join(f"${i+1}" for i in range(len(status_filter)))
-                query += f" AND latest.status IN ({placeholders})"
-                params = list(status_filter)
-            elif dismissed_only:
-                query += " AND latest.status = 'ignored'"
-            elif not include_dismissed:
-                query += " AND latest.status IN ('new', 'investigating')"
-
-            query += " ORDER BY latest.created_at DESC"
 
             rows = await conn.fetch(query, *params)
             return [self._row_to_pod_failure(row) for row in rows]
@@ -292,3 +299,19 @@ class PodFailureMixin:
             )
             count = int(result.split()[-1]) if result else 0
             return count > 0
+
+    async def prune_resolved_pod_failures(self, max_age_hours: int = 24) -> int:
+        """Delete resolved pod failure rows older than max_age_hours to prevent unbounded growth."""
+        async with self._acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM pod_failures
+                WHERE status = 'resolved'
+                  AND COALESCE(resolved_at, created_at) < NOW() - make_interval(hours => $1)
+                """,
+                max_age_hours,
+            )
+            try:
+                return int(result.split()[-1])
+            except Exception:
+                return 0
