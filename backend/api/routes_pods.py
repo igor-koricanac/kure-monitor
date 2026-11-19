@@ -302,7 +302,10 @@ def create_pod_router(deps: RouterDeps) -> APIRouter:
                     failures = [p for p in failures if p.namespace in allowed_ns]
             return failures
         except Exception as e:
-            logger.error(f"Error getting pod failures: {e}")
+            logger.error(
+                f"Error getting pod failures: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
             raise HTTPException(status_code=500, detail="Internal server error")
 
     @router.delete("/pods/failed/{pod_id}")

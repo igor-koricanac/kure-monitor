@@ -674,6 +674,17 @@ class PostgreSQLDatabase(
                     )
                 """)
 
+                # Composite index for fast DISTINCT ON (pod_name, namespace) ORDER BY created_at DESC
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_pod_failures_pod_ns_created
+                    ON pod_failures(pod_name, namespace, created_at DESC)
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_pod_failures_active_status
+                    ON pod_failures(status, created_at DESC)
+                    WHERE status IN ('new', 'investigating')
+                """)
+
             logger.info("PostgreSQL database initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL database: {e}")

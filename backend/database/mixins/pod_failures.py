@@ -162,26 +162,30 @@ class PodFailureMixin:
         """Get all pod failures from database (latest per pod)"""
         async with self._acquire() as conn:
             query = """
-                SELECT * FROM (
-                    SELECT pf.*,
-                           EXISTS(SELECT 1 FROM pod_failure_logs pfl WHERE pfl.pod_failure_id = pf.id) AS logs_captured,
-                           ROW_NUMBER() OVER (PARTITION BY pf.pod_name, pf.namespace ORDER BY pf.created_at DESC) as rn
-                    FROM pod_failures pf
-                ) ranked
-                WHERE rn = 1
+                SELECT latest.*,
+                       EXISTS(
+                           SELECT 1 FROM pod_failure_logs pfl
+                           WHERE pfl.pod_failure_id = latest.id
+                       ) AS logs_captured
+                FROM (
+                    SELECT DISTINCT ON (pod_name, namespace) *
+                    FROM pod_failures
+                    ORDER BY pod_name, namespace, created_at DESC
+                ) latest
+                WHERE TRUE
             """
 
             params = []
             if status_filter:
                 placeholders = ", ".join(f"${i+1}" for i in range(len(status_filter)))
-                query += f" AND status IN ({placeholders})"
+                query += f" AND latest.status IN ({placeholders})"
                 params = list(status_filter)
             elif dismissed_only:
-                query += " AND status = 'ignored'"
+                query += " AND latest.status = 'ignored'"
             elif not include_dismissed:
-                query += " AND status IN ('new', 'investigating')"
+                query += " AND latest.status IN ('new', 'investigating')"
 
-            query += " ORDER BY created_at DESC"
+            query += " ORDER BY latest.created_at DESC"
 
             rows = await conn.fetch(query, *params)
             return [self._row_to_pod_failure(row) for row in rows]
