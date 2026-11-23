@@ -303,15 +303,20 @@ class PodFailureMixin:
     async def prune_resolved_pod_failures(self, max_age_hours: int = 24) -> int:
         """Delete resolved pod failure rows older than max_age_hours to prevent unbounded growth."""
         async with self._acquire() as conn:
-            result = await conn.execute(
-                """
-                DELETE FROM pod_failures
-                WHERE status = 'resolved'
-                  AND COALESCE(resolved_at, created_at) < NOW() - make_interval(hours => $1)
-                """,
-                max_age_hours,
-            )
-            try:
-                return int(result.split()[-1])
-            except Exception:
-                return 0
+            async with conn.transaction():
+                # Ensure only one backend replica prunes at a time in multi-replica deployments
+                acquired = await conn.fetchval("SELECT pg_try_advisory_xact_lock(75013901)")
+                if not acquired:
+                    return 0
+                result = await conn.execute(
+                    """
+                    DELETE FROM pod_failures
+                    WHERE status = 'resolved'
+                      AND COALESCE(resolved_at, created_at) < NOW() - make_interval(hours => $1)
+                    """,
+                    max_age_hours,
+                )
+                try:
+                    return int(result.split()[-1])
+                except Exception:
+                    return 0

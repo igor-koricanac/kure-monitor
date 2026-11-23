@@ -64,6 +64,17 @@ def create_app() -> FastAPI:
         # Start mirror pod cleanup task
         await mirror_service.start_cleanup_task()
 
+        # Start PostgreSQL LISTEN/NOTIFY pub/sub for multi-replica WS + config sync
+        async def _on_config_reload(event: str):
+            if event == "llm_reload":
+                try:
+                    await solution_engine.reload_providers()
+                    logger.info("Reloaded LLM providers via cross-replica notification")
+                except Exception as e:
+                    logger.warning(f"Failed cross-replica LLM reload: {e}")
+
+        await websocket_manager.start_pg_pubsub(db, on_config_reload=_on_config_reload)
+
         # Periodically prune resolved pod failures (>24h old) to prevent unbounded table growth
         async def _prune_resolved_loop():
             import asyncio
@@ -87,6 +98,7 @@ def create_app() -> FastAPI:
         yield
 
         # Shutdown
+        await websocket_manager.stop_pg_pubsub()
         prune_task.cancel()
         try:
             await prune_task

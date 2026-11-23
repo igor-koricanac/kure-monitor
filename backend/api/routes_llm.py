@@ -205,6 +205,7 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
             )
 
             await solution_engine.reload_providers()
+            await websocket_manager.publish_config_reload("llm_reload")
             logger.info(f"Registered new LLM config '{name}' ({config.provider})")
 
             return LLMConfigItemResponse(
@@ -246,6 +247,7 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 raise HTTPException(status_code=404, detail="LLM configuration not found")
 
             await solution_engine.reload_providers()
+            await websocket_manager.publish_config_reload("llm_reload")
             logger.info(f"Updated LLM config ID={config_id}")
 
             return LLMConfigItemResponse(
@@ -276,6 +278,7 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 raise HTTPException(status_code=404, detail="LLM configuration not found")
 
             await solution_engine.reload_providers()
+            await websocket_manager.publish_config_reload("llm_reload")
             logger.info(f"Deleted LLM config ID={config_id}")
             return {"message": "LLM configuration deleted"}
         except HTTPException:
@@ -293,6 +296,7 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 raise HTTPException(status_code=404, detail="LLM configuration not found")
 
             await solution_engine.reload_providers()
+            await websocket_manager.publish_config_reload("llm_reload")
             logger.info(f"Set LLM config ID={config_id} as default")
             return {"message": f"LLM config {config_id} set as default"}
         except HTTPException:

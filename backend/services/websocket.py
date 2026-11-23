@@ -2,20 +2,172 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import asyncio
 import json
 import logging
-from typing import List, Optional
+import uuid
+from typing import Callable, Awaitable, List, Optional
 from api.auth import SESSION_COOKIE_NAME, validate_ws_auth
 from models.models import PodFailureResponse, SecurityFindingResponse
 from services.prometheus_metrics import WEBSOCKET_CONNECTIONS_ACTIVE
 
 logger = logging.getLogger(__name__)
 
+PG_WS_CHANNEL = "kure_ws_events"
+PG_CONFIG_CHANNEL = "kure_config_events"
+PG_NOTIFY_MAX_BYTES = 7500
+
 
 class WebSocketManager:
     def __init__(self):
+        self.instance_id: str = uuid.uuid4().hex
         self.active_connections: List[WebSocket] = []
         self.connection_principals: dict[WebSocket, dict] = {}
+        self._db = None
+        self._pg_listener_conn = None
+        self._pg_listener_task: Optional[asyncio.Task] = None
+        self._on_config_reload: Optional[Callable[[str], Awaitable[None]]] = None
         self.router = APIRouter()
         self.router.websocket("/ws")(self.websocket_endpoint)
+
+    async def start_pg_pubsub(
+        self, db, on_config_reload: Optional[Callable[[str], Awaitable[None]]] = None
+    ) -> None:
+        """Start PostgreSQL LISTEN/NOTIFY listener for multi-replica fanout."""
+        self._db = db
+        self._on_config_reload = on_config_reload
+        pg_db = getattr(db, "_db", db)
+        conn_str = getattr(pg_db, "connection_string", None)
+        if not conn_str:
+            return
+
+        async def _listen_loop():
+            import asyncpg
+
+            while True:
+                conn = None
+                try:
+                    conn = await asyncpg.connect(conn_str)
+                    self._pg_listener_conn = conn
+
+                    def _on_ws_notify(connection, pid, channel, payload_str):
+                        try:
+                            envelope = json.loads(payload_str)
+                        except Exception:
+                            return
+                        if envelope.get("origin") == self.instance_id:
+                            return
+                        asyncio.create_task(
+                            self._deliver_local(
+                                envelope.get("type", ""),
+                                envelope.get("data"),
+                                parallel=bool(envelope.get("parallel", False)),
+                            )
+                        )
+
+                    def _on_cfg_notify(connection, pid, channel, payload_str):
+                        try:
+                            envelope = json.loads(payload_str)
+                        except Exception:
+                            return
+                        if envelope.get("origin") == self.instance_id:
+                            return
+                        if self._on_config_reload:
+                            asyncio.create_task(
+                                self._on_config_reload(envelope.get("event", "llm_reload"))
+                            )
+
+                    await conn.add_listener(PG_WS_CHANNEL, _on_ws_notify)
+                    await conn.add_listener(PG_CONFIG_CHANNEL, _on_cfg_notify)
+                    logger.info(
+                        f"PostgreSQL pub/sub listener started (instance={self.instance_id[:8]})"
+                    )
+                    # Keep connection alive until cancelled or dropped
+                    while not conn.is_closed():
+                        await asyncio.sleep(30)
+                        await conn.execute("SELECT 1")
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.warning(f"PostgreSQL pub/sub listener disconnected: {e}; reconnecting in 5s")
+                    try:
+                        await asyncio.sleep(5)
+                    except asyncio.CancelledError:
+                        break
+                finally:
+                    self._pg_listener_conn = None
+                    if conn is not None and not conn.is_closed():
+                        try:
+                            await conn.close()
+                        except Exception:
+                            pass
+
+        self._pg_listener_task = asyncio.create_task(_listen_loop())
+
+    async def stop_pg_pubsub(self) -> None:
+        """Stop PostgreSQL LISTEN/NOTIFY listener cleanly."""
+        if self._pg_listener_task is not None:
+            self._pg_listener_task.cancel()
+            try:
+                await self._pg_listener_task
+            except asyncio.CancelledError:
+                pass
+            self._pg_listener_task = None
+        if self._pg_listener_conn is not None and not self._pg_listener_conn.is_closed():
+            try:
+                await self._pg_listener_conn.close()
+            except Exception:
+                pass
+            self._pg_listener_conn = None
+
+    async def publish_config_reload(self, event: str = "llm_reload") -> None:
+        """Notify sibling replicas to reload in-memory config (e.g., LLM providers)."""
+        pg_db = getattr(self._db, "_db", self._db) if self._db else None
+        pool = getattr(pg_db, "pool", None) if pg_db else None
+        if not pool:
+            return
+        payload = json.dumps({"origin": self.instance_id, "event": event})
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute("SELECT pg_notify($1, $2)", PG_CONFIG_CHANNEL, payload)
+        except Exception as e:
+            logger.warning(f"Failed to publish config reload notify: {e}")
+
+    async def _publish_pg_notify(
+        self, message_type: str, data, parallel: bool = False
+    ) -> None:
+        """Publish a WebSocket event to sibling replicas via PostgreSQL NOTIFY."""
+        pg_db = getattr(self._db, "_db", self._db) if self._db else None
+        pool = getattr(pg_db, "pool", None) if pg_db else None
+        if not pool:
+            return
+
+        envelope = {
+            "origin": self.instance_id,
+            "type": message_type,
+            "data": data,
+            "parallel": parallel,
+        }
+        payload = json.dumps(envelope, default=str)
+
+        # PostgreSQL NOTIFY payload limit is 8000 bytes; strip heavy blobs if needed
+        if len(payload.encode("utf-8")) > PG_NOTIFY_MAX_BYTES and isinstance(data, dict):
+            trimmed = {
+                k: v
+                for k, v in data.items()
+                if k not in ("manifest", "logs", "events")
+            }
+            envelope["data"] = trimmed
+            payload = json.dumps(envelope, default=str)
+
+        if len(payload.encode("utf-8")) > PG_NOTIFY_MAX_BYTES:
+            logger.debug(
+                f"Skipping PG NOTIFY for {message_type}: payload exceeds {PG_NOTIFY_MAX_BYTES} bytes"
+            )
+            return
+
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute("SELECT pg_notify($1, $2)", PG_WS_CHANNEL, payload)
+        except Exception as e:
+            logger.warning(f"Failed to publish WS event via PG NOTIFY: {e}")
 
     async def connect(self, websocket: WebSocket, principal: Optional[dict] = None):
         await websocket.accept()
@@ -60,14 +212,21 @@ class WebSocketManager:
     async def _broadcast(
         self, message_type: str, data, description: str = None, parallel: bool = False
     ):
-        """Generic broadcast to all connected WebSocket clients.
+        """Generic broadcast to all connected WebSocket clients (local + sibling replicas)."""
+        if hasattr(data, "model_dump"):
+            data = data.model_dump()
 
-        Args:
-            message_type: The message type string sent to clients.
-            data: The payload (dict, list, or Pydantic model with .model_dump()).
-            description: Human-readable label for log messages. Defaults to message_type.
-            parallel: If True, send to all clients concurrently with timeouts.
-        """
+        # Fan out to sibling replicas via PostgreSQL NOTIFY (skipped if no PG pool)
+        await self._publish_pg_notify(message_type, data, parallel=parallel)
+        # Deliver to locally connected clients
+        await self._deliver_local(
+            message_type, data, description=description, parallel=parallel
+        )
+
+    async def _deliver_local(
+        self, message_type: str, data, description: str = None, parallel: bool = False
+    ):
+        """Deliver a WebSocket message to clients connected to this replica."""
         if not self.active_connections:
             return
 
