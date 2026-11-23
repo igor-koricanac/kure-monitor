@@ -169,7 +169,15 @@ const DiagramTab = ({ isDark = false }) => {
         }
         setDiagram(res);
       } catch (err) {
-        setError(`Failed to load diagram: ${err.message || 'unknown error'}`);
+        const msg = String(err?.message || '');
+        if (err?.status === 404 || msg.includes('404')) {
+          const target = roleScope === 'cluster' ? `ClusterRole "${clusterRoleName}"` : `Role "${roleNamespace}/${roleName}"`;
+          setError(`${target} was not found.`);
+        } else if (err?.status === 403 || msg.includes('403')) {
+          setError("You don't have permission to view this RBAC resource.");
+        } else {
+          setError(`Failed to load diagram: ${err.message || 'unknown error'}`);
+        }
         setDiagram(null);
       } finally {
         setLoading(false);
@@ -194,7 +202,23 @@ const DiagramTab = ({ isDark = false }) => {
           : await api.getDiagramWorkload(namespace, kind, workloadName.trim());
       setDiagram(res);
     } catch (err) {
-      setError(`Failed to load diagram: ${err.message || 'unknown error'}`);
+      const msg = String(err?.message || '');
+      if (err?.status === 404 || msg.includes('404')) {
+        if (mode === 'workload') {
+          const trimmed = workloadName.trim();
+          setError(
+            trimmed
+              ? `No ${kind} named "${trimmed}" found in namespace "${namespace}".`
+              : `No ${kind} resources found in namespace "${namespace}".`
+          );
+        } else {
+          setError(`Namespace "${namespace}" was not found.`);
+        }
+      } else if (err?.status === 403 || msg.includes('403')) {
+        setError(`You don't have permission to view namespace "${namespace}".`);
+      } else {
+        setError(`Failed to load diagram: ${err.message || 'unknown error'}`);
+      }
       setDiagram(null);
     } finally {
       setLoading(false);

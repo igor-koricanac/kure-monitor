@@ -3,8 +3,8 @@ name: kure
 description: Kubernetes AI observability platform with proactive AI Advice, security scanning, topology diagrams, and pod failure diagnosis.
 type: application
 kubeVersion: ">=1.20.0-0"
-version: 2.6.2
-appVersion: "2.6.2"
+version: 2.6.3
+appVersion: "2.6.3"
 icon: "https://raw.githubusercontent.com/igor-koricanac/kure-monitor/main/docs/images/kure_monitor_logo_white_background.svg"
 keywords:
   - kubernetes
@@ -24,12 +24,14 @@ maintainers:
 annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/changes: |
-    - kind: fixed
-      description: "Large-Cluster /api/pods/failed Performance: Filter active statuses inside DISTINCT ON with new PostgreSQL indexes to eliminate 60s query timeouts."
-    - kind: fixed
-      description: "Node-Scoped DaemonSet Agent: Scope kure-agent pods to their own node via Downward API NODE_NAME and deduplicate concurrent reports with PostgreSQL advisory locks."
     - kind: added
-      description: "Automatic Resolved Pod Cleanup: Hourly background task prunes resolved pod_failures older than 24 hours to prevent unbounded table growth."
+      description: "Multi-Replica Backend HA: PostgreSQL LISTEN/NOTIFY cross-replica WebSocket fanout and LLM config sync with advisory-locked cleanup jobs."
+    - kind: added
+      description: "Admin-Only Audit Log: Full mutation audit trail with live WebSocket streaming, PostgreSQL storage, structured stdout JSON, CSV/JSON export, and configurable retention (auditLog.retentionDays)."
+    - kind: added
+      description: "LLM Reasoning Effort & Proxy URL: Optional reasoning_effort and HTTP/HTTPS proxy_url support for LLM providers."
+    - kind: changed
+      description: "Topology Diagram Redesign: Modern resource cards, Horizontal default layout, orthogonal edges, Find Node jump-to search, Core Only filter, and interactive MiniMap."
   artifacthub.io/category: monitoring-logging
   artifacthub.io/displayName: Kure - Kubernetes Failure Diagnosis
   artifacthub.io/license: Apache-2.0
@@ -49,7 +51,7 @@ annotations:
     helm repo add kure-monitor https://kuremonitor.com/
 
     # Install Kure Monitor
-    helm install kure-monitor kure-monitor/kure --version 2.6.2 \
+    helm install kure-monitor kure-monitor/kure --version 2.6.3 \
       --create-namespace --namespace kure-system \
       --set postgresql.password="$(openssl rand -hex 24)"
 

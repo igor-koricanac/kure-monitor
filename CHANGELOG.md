@@ -5,6 +5,14 @@ All notable changes to Kure Monitor are documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.3] - 2026-11-23
+
+Headline changes:
+- **Multi-Replica Backend HA Support (`backend.replicaCount: 2+`)**: Enabled safe horizontal scaling of the backend API without external dependencies using PostgreSQL `LISTEN/NOTIFY` for cross-replica WebSocket fanout and LLM config reload sync (with per-pod `instance_id` deduplication), plus PostgreSQL advisory-lock guarding for background cleanup tasks.
+- **Admin-Only Audit Log & Real-Time Streaming**: Added comprehensive mutation auditing across Pods, Mirror Pods, AI/LLM configs, Security Scanner, Exclusions, AI Advice, Notifications, SSO, Auth, Users, and Teams. Events are persisted in PostgreSQL (`audit_logs` with `JSONB` details and configurable retention via Admin UI or Helm `auditLog.retentionDays`), emitted as structured JSON to `stdout` (`kure.audit`), and streamed live to `admin` WebSocket sessions. Includes an Admin-only **Audit Log** tab with search, action filtering, expandable JSON details, and CSV/JSON export. All secrets, API keys, passwords, and proxy credentials are automatically redacted.
+- **LLM Reasoning Effort & HTTP/HTTPS Proxy Support**: Added optional `reasoning_effort` (`low`, `medium`, `high`, or model default) and optional `proxy_url` (supporting embedded credentials for air-gapped/corporate proxy environments) in **Admin Panel → AI Configuration**.
+- **Topology Diagram Redesign & Navigation**: Upgraded Diagram resource cards with clean left color accents, icon badges, and live status dots; defaulted to Horizontal (`LR`) layout with orthogonal `smoothstep` edges; added **Find node...** jump-to-node search, **Core Only / All Resources** filter, interactive **MiniMap**, smart auto-collapse for busy namespaces, and friendly 404/403 error messages.
+
 ## [2.6.2] - 2026-11-19
 
 Headline changes:

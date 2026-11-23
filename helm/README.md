@@ -75,15 +75,15 @@ existing users out).
 | `global.initImage.repository` | Default init container image repository for readiness checks | `curlimages/curl` |
 | `global.initImage.tag` | Default init container image tag | `8.15.0` |
 | `agent.pendingGracePeriod` | Seconds before reporting Pending pods as failed | `120` |
-| `agent.image.tag` | Agent image tag | `2.6.2` |
+| `agent.image.tag` | Agent image tag | `2.6.3` |
 | `agent.initImage.repository` | Agent init container image repository override | `""` |
 | `agent.initImage.tag` | Agent init container image tag override | `""` |
-| `securityScanner.image.tag` | Security scanner image tag | `2.6.2` |
+| `securityScanner.image.tag` | Security scanner image tag | `2.6.3` |
 | `securityScanner.initImage.repository` | Security scanner init container image repository override | `""` |
 | `securityScanner.initImage.tag` | Security scanner init container image tag override | `""` |
 | `backend.replicaCount` | Backend replica count | `1` |
-| `backend.image.tag` | Backend image tag | `2.6.2` |
-| `frontend.image.tag` | Frontend image tag | `2.6.2` |
+| `backend.image.tag` | Backend image tag | `2.6.3` |
+| `frontend.image.tag` | Frontend image tag | `2.6.3` |
 
 ### LLM Configuration
 
@@ -259,7 +259,7 @@ helm install kure-monitor kure-monitor/kure \
 
 ```bash
 helm repo update
-helm upgrade kure-monitor kure-monitor/kure --version 2.6.2 -n kure-system
+helm upgrade kure-monitor kure-monitor/kure --version 2.6.3 -n kure-system
 ```
 
 ## Uninstall

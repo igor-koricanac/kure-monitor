@@ -1,22 +1,22 @@
-version: 2.6.2
+version: 2.6.3
 name: kure
 category: monitoring-logging
 displayName: Kure - Kubernetes Failure Diagnosis
-createdAt: 2026-11-19T00:00:00Z
+createdAt: 2026-11-23T00:00:00Z
 description: |
   Kubernetes AI observability platform. Instantly detect and debug pod failures (CrashLoopBackOff, ImagePullBackOff, Pending, OOMKilled), proactively scan your entire cluster with the AI Advice engine, visualize workloads with an interactive topology Diagram, and audit your configurations with a built-in Security Scanner.
 license: Apache-2.0
 homeURL: https://kuremonitor.com
-appVersion: "2.6.2"
+appVersion: "2.6.3"
 containersImages:
   - name: agent
-    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.6.2
+    image: ghcr.io/igor-koricanac/kure-monitor/agent:2.6.3
   - name: backend
-    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.6.2
+    image: ghcr.io/igor-koricanac/kure-monitor/backend:2.6.3
   - name: frontend
-    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.6.2
+    image: ghcr.io/igor-koricanac/kure-monitor/frontend:2.6.3
   - name: security-scanner
-    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.6.2
+    image: ghcr.io/igor-koricanac/kure-monitor/security-scanner:2.6.3
 operator: false
 deprecated: false
 prerelease: false
@@ -41,16 +41,18 @@ maintainers:
 provider:
   name: igor-koricanac
 changes:
-  - kind: fixed
-    description: "Large-Cluster /api/pods/failed Performance: Filter active statuses inside DISTINCT ON with new PostgreSQL indexes to eliminate 60s query timeouts."
-  - kind: fixed
-    description: "Node-Scoped DaemonSet Agent: Scope kure-agent pods to their own node via Downward API NODE_NAME and deduplicate concurrent reports with PostgreSQL advisory locks."
   - kind: added
-    description: "Automatic Resolved Pod Cleanup: Hourly background task prunes resolved pod_failures older than 24 hours to prevent unbounded table growth."
+    description: "Multi-Replica Backend HA: PostgreSQL LISTEN/NOTIFY cross-replica WebSocket fanout and LLM config sync with advisory-locked cleanup jobs."
+  - kind: added
+    description: "Admin-Only Audit Log: Full mutation audit trail with live WebSocket streaming, PostgreSQL storage, structured stdout JSON, CSV/JSON export, and configurable retention (auditLog.retentionDays)."
+  - kind: added
+    description: "LLM Reasoning Effort & Proxy URL: Optional reasoning_effort and HTTP/HTTPS proxy_url support for LLM providers."
+  - kind: changed
+    description: "Topology Diagram Redesign: Modern resource cards, Horizontal default layout, orthogonal edges, Find Node jump-to search, Core Only filter, and interactive MiniMap."
 install: |
   helm repo add kure-monitor https://kuremonitor.com/
 
-  helm install kure-monitor kure-monitor/kure --version 2.6.2 \
+  helm install kure-monitor kure-monitor/kure --version 2.6.3 \
     --create-namespace --namespace kure-system \
     --set postgresql.password="$(openssl rand -hex 24)"
 
