@@ -20,40 +20,61 @@ import {
   Calendar,
   Briefcase,
   HelpCircle,
+  FolderOpen,
 } from 'lucide-react';
 
 const KIND_STYLE = {
-  Deployment:              { icon: Layers,       light: 'bg-blue-50 border-blue-300 text-blue-900',           dark: 'bg-blue-900/40 border-blue-700 text-blue-100' },
-  StatefulSet:             { icon: Layers,       light: 'bg-blue-50 border-blue-300 text-blue-900',     dark: 'bg-blue-900/40 border-blue-700 text-blue-100' },
-  DaemonSet:               { icon: Layers,       light: 'bg-cyan-50 border-cyan-300 text-cyan-900',           dark: 'bg-cyan-900/40 border-cyan-700 text-cyan-100' },
-  ReplicaSet:              { icon: RefreshCw,    light: 'bg-sky-50 border-sky-300 text-sky-900',              dark: 'bg-sky-900/40 border-sky-700 text-sky-100' },
-  Pod:                     { icon: Box,          light: 'bg-emerald-50 border-emerald-300 text-emerald-900',  dark: 'bg-emerald-900/40 border-emerald-700 text-emerald-100' },
-  Service:                 { icon: Server,       light: 'bg-blue-50 border-blue-300 text-blue-900',     dark: 'bg-blue-900/40 border-blue-700 text-blue-100' },
-  Endpoints:               { icon: Network,      light: 'bg-blue-50 border-blue-200 text-blue-800',     dark: 'bg-blue-900/30 border-blue-800 text-blue-200' },
-  EndpointSlice:           { icon: Network,      light: 'bg-blue-50 border-blue-200 text-blue-800',     dark: 'bg-blue-900/30 border-blue-800 text-blue-200' },
-  Ingress:                 { icon: Globe,        light: 'bg-rose-50 border-rose-300 text-rose-900',           dark: 'bg-rose-900/40 border-rose-700 text-rose-100' },
-  ConfigMap:               { icon: SettingsIcon, light: 'bg-yellow-50 border-yellow-300 text-yellow-900',        dark: 'bg-yellow-900/40 border-yellow-700 text-yellow-100' },
-  Secret:                  { icon: Lock,         light: 'bg-yellow-50 border-yellow-400 text-yellow-900',     dark: 'bg-yellow-900/40 border-yellow-600 text-yellow-100' },
-  PersistentVolumeClaim:   { icon: Database,     light: 'bg-teal-50 border-teal-300 text-teal-900',           dark: 'bg-teal-900/40 border-teal-700 text-teal-100' },
-  ServiceAccount:          { icon: User,         light: 'bg-blue-50 border-blue-300 text-blue-900',  dark: 'bg-blue-900/40 border-blue-700 text-blue-100' },
-  HorizontalPodAutoscaler: { icon: TrendingUp,   light: 'bg-green-50 border-green-300 text-green-900',        dark: 'bg-green-900/40 border-green-700 text-green-100' },
-  NetworkPolicy:           { icon: Shield,       light: 'bg-red-50 border-red-300 text-red-900',     dark: 'bg-red-900/40 border-red-700 text-red-100' },
-  Job:                     { icon: Briefcase,    light: 'bg-slate-50 border-slate-300 text-slate-900',        dark: 'bg-slate-800/60 border-slate-600 text-slate-100' },
-  CronJob:                 { icon: Calendar,     light: 'bg-stone-50 border-stone-300 text-stone-900',        dark: 'bg-stone-800/60 border-stone-600 text-stone-100' },
+  Deployment:              { icon: Layers,       accent: 'border-l-blue-500',    badgeLight: 'bg-blue-50 text-blue-600',       badgeDark: 'bg-blue-500/15 text-blue-300' },
+  StatefulSet:             { icon: Layers,       accent: 'border-l-indigo-500',  badgeLight: 'bg-indigo-50 text-indigo-600',   badgeDark: 'bg-indigo-500/15 text-indigo-300' },
+  DaemonSet:               { icon: Layers,       accent: 'border-l-cyan-500',    badgeLight: 'bg-cyan-50 text-cyan-600',       badgeDark: 'bg-cyan-500/15 text-cyan-300' },
+  ReplicaSet:              { icon: RefreshCw,    accent: 'border-l-sky-400',     badgeLight: 'bg-sky-50 text-sky-600',         badgeDark: 'bg-sky-500/15 text-sky-300' },
+  Pod:                     { icon: Box,          accent: 'border-l-emerald-500', badgeLight: 'bg-emerald-50 text-emerald-600', badgeDark: 'bg-emerald-500/15 text-emerald-300' },
+  Service:                 { icon: Server,       accent: 'border-l-violet-500',  badgeLight: 'bg-violet-50 text-violet-600',   badgeDark: 'bg-violet-500/15 text-violet-300' },
+  Endpoints:               { icon: Network,      accent: 'border-l-violet-400',  badgeLight: 'bg-violet-50 text-violet-500',   badgeDark: 'bg-violet-500/15 text-violet-300' },
+  EndpointSlice:           { icon: Network,      accent: 'border-l-violet-400',  badgeLight: 'bg-violet-50 text-violet-500',   badgeDark: 'bg-violet-500/15 text-violet-300' },
+  Ingress:                 { icon: Globe,        accent: 'border-l-rose-500',    badgeLight: 'bg-rose-50 text-rose-600',       badgeDark: 'bg-rose-500/15 text-rose-300' },
+  ConfigMap:               { icon: SettingsIcon, accent: 'border-l-amber-500',   badgeLight: 'bg-amber-50 text-amber-600',     badgeDark: 'bg-amber-500/15 text-amber-300' },
+  Secret:                  { icon: Lock,         accent: 'border-l-orange-500',  badgeLight: 'bg-orange-50 text-orange-600',   badgeDark: 'bg-orange-500/15 text-orange-300' },
+  PersistentVolumeClaim:   { icon: Database,     accent: 'border-l-teal-500',    badgeLight: 'bg-teal-50 text-teal-600',       badgeDark: 'bg-teal-500/15 text-teal-300' },
+  ServiceAccount:          { icon: User,         accent: 'border-l-slate-500',   badgeLight: 'bg-slate-100 text-slate-600',    badgeDark: 'bg-slate-500/20 text-slate-300' },
+  HorizontalPodAutoscaler: { icon: TrendingUp,   accent: 'border-l-green-500',   badgeLight: 'bg-green-50 text-green-600',     badgeDark: 'bg-green-500/15 text-green-300' },
+  NetworkPolicy:           { icon: Shield,       accent: 'border-l-red-500',     badgeLight: 'bg-red-50 text-red-600',         badgeDark: 'bg-red-500/15 text-red-300' },
+  Job:                     { icon: Briefcase,    accent: 'border-l-slate-500',   badgeLight: 'bg-slate-100 text-slate-600',    badgeDark: 'bg-slate-500/20 text-slate-300' },
+  CronJob:                 { icon: Calendar,     accent: 'border-l-stone-500',   badgeLight: 'bg-stone-100 text-stone-600',    badgeDark: 'bg-stone-500/20 text-stone-300' },
   // RBAC kinds
-  Role:                    { icon: ShieldCheck,  light: 'bg-yellow-50 border-yellow-400 text-yellow-900',        dark: 'bg-yellow-900/40 border-yellow-600 text-yellow-100' },
-  ClusterRole:             { icon: ShieldCheck,  light: 'bg-yellow-100 border-yellow-500 text-yellow-900',       dark: 'bg-yellow-800/50 border-yellow-500 text-yellow-50' },
-  RoleBinding:             { icon: LinkIcon,     light: 'bg-blue-50 border-blue-300 text-blue-900',     dark: 'bg-blue-900/40 border-blue-700 text-blue-100' },
-  ClusterRoleBinding:      { icon: LinkIcon,     light: 'bg-blue-100 border-blue-400 text-blue-900',    dark: 'bg-blue-800/50 border-blue-500 text-blue-50' },
-  'Subject:User':          { icon: User,         light: 'bg-slate-50 border-slate-300 text-slate-900',        dark: 'bg-slate-800/60 border-slate-600 text-slate-100' },
-  'Subject:Group':         { icon: Users,        light: 'bg-slate-100 border-slate-400 text-slate-900',       dark: 'bg-slate-700/60 border-slate-500 text-slate-50' },
-  Permission:              { icon: Key,          light: 'bg-neutral-50 border-neutral-300 text-neutral-900',  dark: 'bg-neutral-800/60 border-neutral-600 text-neutral-100' },
+  Role:                    { icon: ShieldCheck,  accent: 'border-l-amber-500',   badgeLight: 'bg-amber-50 text-amber-600',     badgeDark: 'bg-amber-500/15 text-amber-300' },
+  ClusterRole:             { icon: ShieldCheck,  accent: 'border-l-orange-500',  badgeLight: 'bg-orange-50 text-orange-600',   badgeDark: 'bg-orange-500/15 text-orange-300' },
+  RoleBinding:             { icon: LinkIcon,     accent: 'border-l-blue-500',    badgeLight: 'bg-blue-50 text-blue-600',       badgeDark: 'bg-blue-500/15 text-blue-300' },
+  ClusterRoleBinding:      { icon: LinkIcon,     accent: 'border-l-indigo-500',  badgeLight: 'bg-indigo-50 text-indigo-600',   badgeDark: 'bg-indigo-500/15 text-indigo-300' },
+  'Subject:User':          { icon: User,         accent: 'border-l-slate-500',   badgeLight: 'bg-slate-100 text-slate-600',    badgeDark: 'bg-slate-500/20 text-slate-300' },
+  'Subject:Group':         { icon: Users,        accent: 'border-l-slate-600',   badgeLight: 'bg-slate-100 text-slate-700',    badgeDark: 'bg-slate-500/20 text-slate-200' },
+  Permission:              { icon: Key,          accent: 'border-l-emerald-500', badgeLight: 'bg-emerald-50 text-emerald-600', badgeDark: 'bg-emerald-500/15 text-emerald-300' },
 };
 
-const DEFAULT_STYLE = { icon: HelpCircle, light: 'bg-gray-50 border-gray-300 text-gray-900', dark: 'bg-gray-800 border-gray-600 text-gray-100' };
+const DEFAULT_STYLE = {
+  icon: HelpCircle,
+  accent: 'border-l-gray-400',
+  badgeLight: 'bg-gray-100 text-gray-600',
+  badgeDark: 'bg-gray-700 text-gray-300',
+};
+
+const getStatusDotColor = (status) => {
+  if (!status) return null;
+  const s = String(status).toLowerCase();
+  if (s.includes('fail') || s.includes('crash') || s.includes('error') || s.includes('oom') || s.includes('backoff')) {
+    return 'bg-red-500';
+  }
+  if (s.includes('pending') || s.includes('terminat') || s.includes('waiting') || s.includes('0/')) {
+    return 'bg-amber-400';
+  }
+  if (s.includes('running') || s.includes('ready') || s.includes('active') || s.includes('bound') || s.includes('succeeded')) {
+    return 'bg-emerald-500';
+  }
+  return 'bg-slate-400';
+};
 
 const buildTooltip = (data) => {
-  const lines = [`${data.kind}: ${data.namespace}/${data.name}`];
+  const lines = [`${data.kind}: ${data.namespace ? `${data.namespace}/` : ''}${data.name}`];
   if (data.status) lines.push(`Status: ${data.status}`);
   const md = data.metadata || {};
   if (md.image) lines.push(`Image: ${md.image}`);
@@ -68,68 +89,107 @@ const buildTooltip = (data) => {
 const ResourceNode = memo(({ data }) => {
   const style = KIND_STYLE[data.kind] || DEFAULT_STYLE;
   const Icon = style.icon;
-  const themeClasses = data.isDark ? style.dark : style.light;
   const npsCount = data.metadata?.nps_count || 0;
   const derived = data.metadata?.derived === true;
+  const isLR = data.direction === 'LR';
+  const statusDot = getStatusDotColor(data.status);
+
+  const cardSurface = data.isDark
+    ? 'bg-slate-900/95 border-slate-700/80 text-slate-100 hover:border-slate-500'
+    : 'bg-white border-slate-200/90 text-slate-900 hover:border-slate-300';
 
   return (
     <div
       title={buildTooltip(data)}
-      className={`relative rounded-sm border-2 shadow-sm px-3 py-2 min-w-[170px] max-w-[240px] ${themeClasses} ${
-        derived ? 'border-dashed' : ''
+      className={`relative rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all px-3 py-2.5 w-[220px] ${cardSurface} ${style.accent} ${
+        derived ? 'border-dashed opacity-85' : ''
       }`}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#94a3b8', width: 6, height: 6 }} />
-      <div className="flex items-start space-x-2">
-        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+      <Handle
+        type="target"
+        position={isLR ? Position.Left : Position.Top}
+        style={{ background: '#94a3b8', width: 7, height: 7, border: '2px solid transparent' }}
+      />
+      <div className="flex items-center gap-2.5">
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            data.isDark ? style.badgeDark : style.badgeLight
+          }`}
+        >
+          <Icon className="w-4 h-4" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wide opacity-70 leading-tight">
-            {data.kind}
+          <div className="flex items-center justify-between gap-1">
+            <span className={`text-[10px] font-medium uppercase tracking-wider truncate ${data.isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {data.kind}
+            </span>
+            {npsCount > 0 && (
+              <span
+                className={`flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                  data.isDark
+                    ? 'bg-red-500/20 text-red-300'
+                    : 'bg-red-50 text-red-700'
+                }`}
+                title={`${npsCount} NetworkPolic${npsCount === 1 ? 'y' : 'ies'} select this resource`}
+              >
+                <Shield className="w-2.5 h-2.5" />
+                <span>{npsCount}</span>
+              </span>
+            )}
           </div>
-          <div className="text-xs font-semibold truncate leading-tight" title={data.name}>
+          <div className="text-xs font-semibold truncate mt-0.5" title={data.name}>
             {data.name}
           </div>
           {data.status && (
-            <div className="text-[10px] opacity-80 truncate leading-tight">
-              {data.status}
+            <div className={`flex items-center gap-1.5 mt-1 text-[10px] truncate ${data.isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {statusDot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot}`} />}
+              <span className="truncate">{data.status}</span>
             </div>
           )}
         </div>
-        {npsCount > 0 && (
-          <span
-            className={`flex items-center space-x-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-              data.isDark
-                ? 'bg-red-900/50 border-red-700 text-red-200'
-                : 'bg-red-100 border-red-300 text-red-800'
-            }`}
-            title={`${npsCount} NetworkPolic${npsCount === 1 ? 'y' : 'ies'} select this resource`}
-          >
-            <Shield className="w-3 h-3" />
-            <span>{npsCount}</span>
-          </span>
-        )}
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: '#94a3b8', width: 6, height: 6 }} />
+      <Handle
+        type="source"
+        position={isLR ? Position.Right : Position.Bottom}
+        style={{ background: '#94a3b8', width: 7, height: 7, border: '2px solid transparent' }}
+      />
     </div>
   );
 });
 
 const CollapsedGroupNode = memo(({ data }) => {
+  const isLR = data.direction === 'LR';
   return (
     <div
       onClick={data.onExpand}
-      className={`cursor-pointer rounded-sm border-2 border-dashed shadow-sm px-4 py-3 min-w-[180px] text-center ${
+      className={`cursor-pointer rounded-xl border-2 border-dashed shadow-sm hover:shadow-md transition-all px-4 py-3 w-[220px] ${
         data.isDark
-          ? 'bg-gray-800 border-gray-500 text-gray-100 hover:bg-gray-700'
-          : 'bg-gray-100 border-gray-400 text-gray-900 hover:bg-gray-200'
+          ? 'bg-slate-800/90 border-slate-600 text-slate-100 hover:border-blue-400 hover:bg-slate-800'
+          : 'bg-slate-50 border-slate-300 text-slate-900 hover:border-blue-500 hover:bg-white'
       }`}
       title="Click to expand group"
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#94a3b8', width: 6, height: 6 }} />
-      <div className="text-[10px] uppercase tracking-wide opacity-70">Group (collapsed)</div>
-      <div className="text-sm font-semibold truncate">{data.label}</div>
-      <div className="text-xs opacity-80 mt-1">{data.count} resource{data.count === 1 ? '' : 's'}</div>
-      <Handle type="source" position={Position.Bottom} style={{ background: '#94a3b8', width: 6, height: 6 }} />
+      <Handle
+        type="target"
+        position={isLR ? Position.Left : Position.Top}
+        style={{ background: '#94a3b8', width: 7, height: 7 }}
+      />
+      <div className="flex items-center gap-2.5">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${data.isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600'}`}>
+          <FolderOpen className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-xs font-semibold truncate">{data.label}</div>
+          <div className={`text-[10px] mt-0.5 ${data.isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {data.count} resource{data.count === 1 ? '' : 's'} · click to expand
+          </div>
+        </div>
+      </div>
+      <Handle
+        type="source"
+        position={isLR ? Position.Right : Position.Bottom}
+        style={{ background: '#94a3b8', width: 7, height: 7 }}
+      />
     </div>
   );
 });

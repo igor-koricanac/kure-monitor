@@ -76,6 +76,8 @@ spec:
           value: "{{ .Values.agent.failureLogs.enabled }}"
         - name: FAILURE_LOGS_MAX_LINES
           value: "{{ .Values.agent.failureLogs.maxLines }}"
+        - name: AUDIT_LOG_RETENTION_DAYS
+          value: "{{ (.Values.auditLog).retentionDays | default 90 }}"
         - name: FEATURE_POD_MONITORING
           value: "{{ .Values.features.podMonitoring }}"
         - name: FEATURE_SECURITY_SCAN

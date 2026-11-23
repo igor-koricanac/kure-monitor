@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { AlertCircle, CheckCircle, Bot, Bell, EyeOff, Settings, Users, Mail, KeyRound } from 'lucide-react';
+import { AlertCircle, CheckCircle, Bot, Bell, EyeOff, Settings, Users, Mail, KeyRound, Shield } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import NotificationSettings from './NotificationSettings';
 import LLMSettings from './LLMSettings';
 import ExclusionNamespaces from './admin/ExclusionNamespaces';
@@ -11,8 +12,11 @@ import UsersManager from './admin/UsersManager';
 import InvitationsManager from './admin/InvitationsManager';
 import TeamSettings from './admin/TeamSettings';
 import SSOSettings from './admin/SSOSettings';
+import AuditLogPanel from './admin/AuditLogPanel';
 
-const AdminPanel = ({ isDark = false, onConfigChange }) => {
+const AdminPanel = ({ isDark = false, onConfigChange, auditEvent = null }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   // Tab state
   const [activeTab, setActiveTab] = useState('settings');
   const [settingsSubTab, setSettingsSubTab] = useState('access');
@@ -27,6 +31,7 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
     { id: 'ai', label: 'AI Config', icon: Bot },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'exclusions', label: 'Suppressions', icon: EyeOff },
+    ...(isAdmin ? [{ id: 'audit', label: 'Audit Log', icon: Shield }] : []),
   ];
 
   const settingsSubTabs = [
@@ -191,6 +196,10 @@ const AdminPanel = ({ isDark = false, onConfigChange }) => {
           <ExclusionRules isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
           <ExclusionRegistries isDark={isDark} onError={handleError} onSuccess={handleSuccess} />
         </div>
+      )}
+
+      {activeTab === 'audit' && isAdmin && (
+        <AuditLogPanel isDark={isDark} onError={handleError} onSuccess={handleSuccess} auditEvent={auditEvent} />
       )}
     </div>
   );

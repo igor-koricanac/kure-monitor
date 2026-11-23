@@ -280,6 +280,18 @@ class Database:
     async def set_app_setting(self, key, value):
         return await self._db.set_app_setting(key, value)
 
+    # Audit log methods
+    async def insert_audit_log(self, **kwargs):
+        return await self._db.insert_audit_log(**kwargs)
+
+    async def get_audit_logs(self, action=None, actor=None, search=None, limit=100, offset=0):
+        return await self._db.get_audit_logs(
+            action=action, actor=actor, search=search, limit=limit, offset=offset
+        )
+
+    async def prune_audit_logs(self, retention_days: int = 90):
+        return await self._db.prune_audit_logs(retention_days=retention_days)
+
     async def delete_app_setting(self, key):
         return await self._db.delete_app_setting(key)
 

@@ -1073,4 +1073,48 @@ export const api = {
     }
     return response.json();
   },
+
+  // --- Audit Logs (Admin only) ---
+
+  getAuditLogs: async ({ action = '', actor = '', search = '', limit = 50, offset = 0 } = {}) => {
+    const params = new URLSearchParams();
+    if (action) params.set('action', action);
+    if (actor) params.set('actor', actor);
+    if (search) params.set('search', search);
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const response = await authFetch(`${API_BASE}/api/admin/audit-logs?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  getAuditRetention: async () => {
+    const response = await authFetch(`${API_BASE}/api/admin/audit-logs/retention`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  updateAuditRetention: async (retentionDays) => {
+    const response = await authFetch(`${API_BASE}/api/admin/audit-logs/retention`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retention_days: Number(retentionDays) }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  getAuditExportUrl: ({ format = 'csv', action = '', actor = '', search = '' } = {}) => {
+    const params = new URLSearchParams({ format });
+    if (action) params.set('action', action);
+    if (actor) params.set('actor', actor);
+    if (search) params.set('search', search);
+    return `${API_BASE}/api/admin/audit-logs/export?${params.toString()}`;
+  },
 };

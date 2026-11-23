@@ -11,6 +11,7 @@ from .login_attempts import LoginAttemptsMixin
 from .chat import ChatMixin
 from .chatops import ChatOpsMixin
 from .teams import TeamMixin
+from .audit_logs import AuditLogMixin
 
 __all__ = [
     "PodFailureMixin",

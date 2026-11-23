@@ -17,6 +17,7 @@ from .mixins import (
     ChatMixin,
     ChatOpsMixin,
     TeamMixin,
+    AuditLogMixin,
 )
 from services.prometheus_metrics import DATABASE_QUERIES_TOTAL
 
@@ -38,6 +39,7 @@ class PostgreSQLDatabase(
     ChatMixin,
     ChatOpsMixin,
     TeamMixin,
+    AuditLogMixin,
     DatabaseInterface,
 ):
     def __init__(self):
@@ -694,6 +696,35 @@ class PostgreSQLDatabase(
                     CREATE INDEX IF NOT EXISTS idx_pod_failures_active_status
                     ON pod_failures(status, created_at DESC)
                     WHERE status IN ('new', 'investigating')
+                """)
+
+                # Create audit_logs table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id SERIAL PRIMARY KEY,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        actor_id INT,
+                        actor_username VARCHAR(255) NOT NULL,
+                        actor_role VARCHAR(32),
+                        action VARCHAR(100) NOT NULL,
+                        resource_type VARCHAR(64),
+                        resource_name VARCHAR(255),
+                        ip_address VARCHAR(64),
+                        status VARCHAR(32) NOT NULL DEFAULT 'success',
+                        details JSONB NOT NULL DEFAULT '{}'::jsonb
+                    )
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+                    ON audit_logs(created_at DESC)
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_action
+                    ON audit_logs(action)
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_audit_logs_actor
+                    ON audit_logs(actor_username)
                 """)
 
             logger.info("PostgreSQL database initialized successfully")

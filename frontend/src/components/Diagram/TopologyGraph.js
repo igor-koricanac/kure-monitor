@@ -17,8 +17,8 @@ import { api } from '../../services/api';
 
 const SYNTHESIZED_KINDS = new Set(['Permission', 'Subject:User', 'Subject:Group']);
 
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 70;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 76;
 
 const EDGE_STYLE = {
   owns: {
@@ -86,10 +86,17 @@ const EDGE_STYLE = {
   },
 };
 
-const layoutWithDagre = (rfNodes, rfEdges) => {
+const layoutWithDagre = (rfNodes, rfEdges, direction = 'LR') => {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60, marginx: 20, marginy: 20 });
+  const isLR = direction === 'LR';
+  g.setGraph({
+    rankdir: direction,
+    nodesep: isLR ? 44 : 55,
+    ranksep: isLR ? 95 : 80,
+    marginx: 32,
+    marginy: 32,
+  });
 
   rfNodes.forEach((node) => {
     g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -110,7 +117,7 @@ const layoutWithDagre = (rfNodes, rfEdges) => {
   });
 };
 
-const buildGraphElements = (response, isDark, collapsedGroups) => {
+const buildGraphElements = (response, isDark, collapsedGroups, direction = 'LR') => {
   if (!response) return { nodes: [], edges: [] };
 
   const groups = response.groups || [];
@@ -137,6 +144,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
       status: n.status,
       metadata: n.metadata || {},
       isDark,
+      direction,
       raw: n,
     },
   }));
@@ -151,6 +159,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
         label: g.label,
         count: g.node_ids.length,
         isDark,
+        direction,
       },
     });
   });
@@ -177,7 +186,8 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
       id: `e-${idx}-${src}-${tgt}-${e.type}`,
       source: src,
       target: tgt,
-      type: 'default',
+      type: 'smoothstep',
+      pathOptions: { borderRadius: 12 },
       animated: style.animated,
       style: {
         stroke: style.stroke,
@@ -189,7 +199,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
     });
   });
 
-  return { nodes: layoutWithDagre(rfNodes, rfEdges), edges: rfEdges };
+  return { nodes: layoutWithDagre(rfNodes, rfEdges, direction), edges: rfEdges };
 };
 
 const Legend = ({ isDark, groups, collapsedGroups, onToggleGroup }) => {
@@ -312,8 +322,28 @@ const computeFocusedSet = (focusedEdgeId, nodes, edges) => {
 };
 
 const Inner = ({ data, isDark }) => {
-  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const [direction, setDirection] = useState('LR');
+  const [showLegend, setShowLegend] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    const groups = data?.groups || [];
+    const nodeCount = data?.nodes?.length || 0;
+    if (nodeCount > 14 && groups.length > 0) {
+      return new Set(groups.map((g) => g.id));
+    }
+    return new Set();
+  });
   const [focusedEdgeId, setFocusedEdgeId] = useState(null);
+
+  // Auto-collapse groups when switching to a large namespace (>14 nodes)
+  useEffect(() => {
+    const groups = data?.groups || [];
+    const nodeCount = data?.nodes?.length || 0;
+    if (nodeCount > 14 && groups.length > 0) {
+      setCollapsedGroups(new Set(groups.map((g) => g.id)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  }, [data]);
   const [modalState, setModalState] = useState({
     isOpen: false,
     namespace: '',
@@ -333,8 +363,8 @@ const Inner = ({ data, isDark }) => {
   const { fitView } = useReactFlow();
 
   const { nodes: baseNodes, edges: baseEdges } = useMemo(
-    () => buildGraphElements(data, isDark, collapsedGroups),
-    [data, isDark, collapsedGroups]
+    () => buildGraphElements(data, isDark, collapsedGroups, direction),
+    [data, isDark, collapsedGroups, direction]
   );
 
   // Clear focus if the focused edge no longer exists after data/collapse refresh.
@@ -485,16 +515,70 @@ const Inner = ({ data, isDark }) => {
         minZoom={0.1}
         maxZoom={2}
       >
-        <Background color={isDark ? '#374151' : '#e5e7eb'} gap={16} />
+        <Background color={isDark ? '#1e293b' : '#cbd5e1'} gap={20} size={1.2} />
         <Controls showInteractive={false} />
-        <Panel position="top-right">
-          <Legend
-            isDark={isDark}
-            groups={groups}
-            collapsedGroups={collapsedGroups}
-            onToggleGroup={handleToggleGroup}
-          />
+        <Panel position="top-left">
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border shadow-sm text-xs ${
+              isDark
+                ? 'bg-slate-900/90 border-slate-700 text-slate-200'
+                : 'bg-white/95 border-slate-200 text-slate-700'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setDirection((d) => (d === 'LR' ? 'TB' : 'LR'))}
+              className={`px-2 py-1 rounded font-medium transition-colors ${
+                isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+              }`}
+              title="Switch layout orientation"
+            >
+              Layout: {direction === 'LR' ? 'Horizontal' : 'Vertical'}
+            </button>
+            {groups.length > 0 && (
+              <>
+                <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (collapsedGroups.size === groups.length) {
+                      setCollapsedGroups(new Set());
+                    } else {
+                      setCollapsedGroups(new Set(groups.map((g) => g.id)));
+                    }
+                  }}
+                  className={`px-2 py-1 rounded font-medium transition-colors ${
+                    isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  {collapsedGroups.size === groups.length ? 'Expand All' : 'Collapse All'}
+                </button>
+              </>
+            )}
+            <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+            <button
+              type="button"
+              onClick={() => setShowLegend((v) => !v)}
+              className={`px-2 py-1 rounded font-medium transition-colors ${
+                showLegend
+                  ? isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
+                  : isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+              }`}
+            >
+              Legend
+            </button>
+          </div>
         </Panel>
+        {showLegend && (
+          <Panel position="top-right">
+            <Legend
+              isDark={isDark}
+              groups={groups}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={handleToggleGroup}
+            />
+          </Panel>
+        )}
       </ReactFlow>
       <ManifestModal
         isOpen={modalState.isOpen}
@@ -525,7 +609,7 @@ const Inner = ({ data, isDark }) => {
 
 const TopologyGraph = ({ data, isDark = false }) => {
   return (
-    <div className={`w-full h-full ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
+    <div className={`w-full h-full ${isDark ? 'bg-slate-950' : 'bg-slate-50/70'}`}>
       <ReactFlowProvider>
         <Inner data={data} isDark={isDark} />
       </ReactFlowProvider>

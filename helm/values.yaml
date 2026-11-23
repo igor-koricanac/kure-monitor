@@ -253,6 +253,10 @@ postgresql:
 security:
   encryptionKey: ""  # Fernet key for API key encryption (auto-generated if empty)
 
+# Audit log configuration
+auditLog:
+  retentionDays: 90  # Default number of days to retain audit logs in PostgreSQL (can also be updated in Admin UI)
+
 # Keycloak SSO configuration
 keycloak:
   enabled: false

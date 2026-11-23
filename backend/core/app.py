@@ -51,8 +51,9 @@ def create_app() -> FastAPI:
         # Startup
         await db.init_database()
         logger.info("Database initialized")
-        # Expose db on app state for auth middleware
+        # Expose db and websocket_manager on app state for middleware
         app.state.db = db
+        app.state.websocket_manager = websocket_manager
         # Ensure auth bootstrap values exist (generates & persists on first boot)
         await get_session_secret(db)
         await get_service_token(db)
@@ -83,6 +84,12 @@ def create_app() -> FastAPI:
                     deleted = await db.prune_resolved_pod_failures(max_age_hours=24)
                     if deleted:
                         logger.info(f"Pruned {deleted} resolved pod_failures older than 24h")
+                    raw_ret = await db.get_app_setting("audit_log_retention_days")
+                    from api.routes_audit import get_default_audit_retention_days
+                    audit_days = int(raw_ret) if raw_ret is not None else get_default_audit_retention_days()
+                    pruned_audit = await db.prune_audit_logs(retention_days=audit_days)
+                    if pruned_audit:
+                        logger.info(f"Pruned {pruned_audit} audit_logs older than {audit_days}d")
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
@@ -123,6 +130,8 @@ def create_app() -> FastAPI:
     configure_cors(app)
     configure_gzip(app)
     configure_exception_handlers(app)
+    from services.audit_service import AuditMiddleware
+    app.add_middleware(AuditMiddleware)
 
     # Health check endpoint (outside of API router for compatibility)
     @app.get("/health")

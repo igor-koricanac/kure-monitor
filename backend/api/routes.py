@@ -21,6 +21,7 @@ from .routes_diagram import create_diagram_router
 from .routes_advice import build_router as create_advice_router
 from .routes_chat import create_chat_ingest_router
 from .routes_chatops import create_chatops_router
+from .routes_audit import create_audit_router
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ def create_api_router(
     authed.include_router(create_llm_router(deps))
     authed.include_router(create_users_router(deps))
     authed.include_router(create_teams_router(deps))
+    authed.include_router(create_audit_router(deps))
     authed.include_router(create_diagram_router(deps))
     authed.include_router(create_advice_router(deps))
 

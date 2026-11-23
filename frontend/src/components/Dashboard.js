@@ -62,6 +62,8 @@ const Dashboard = () => {
   // `seq` so AdvicePanel can react via useEffect even when payloads repeat.
   const [adviceEvent, setAdviceEvent] = useState(null);
   const adviceSeqRef = useRef(0);
+  const [auditEvent, setAuditEvent] = useState(null);
+  const auditSeqRef = useRef(0);
   // Security scan rescan notification
   const [securityScanUpdating, setSecurityScanUpdating] = useState(false);
   const securityScanTimeoutRef = useRef(null);
@@ -249,6 +251,12 @@ const Dashboard = () => {
       setAdviceEvent({
         seq: adviceSeqRef.current,
         type: message.type,
+        data: message.data,
+      });
+    } else if (message.type === 'audit_log') {
+      auditSeqRef.current += 1;
+      setAuditEvent({
+        seq: auditSeqRef.current,
         data: message.data,
       });
     } else if (message.type === 'pod_solution_updated') {
@@ -1140,7 +1148,7 @@ const Dashboard = () => {
           )}
 
           {activeTab === 'admin' && userRole === 'admin' && (
-            <AdminPanel isDark={isDark} onConfigChange={handleConfigChange} />
+            <AdminPanel isDark={isDark} onConfigChange={handleConfigChange} auditEvent={auditEvent} />
           )}
 
         </div>

@@ -248,6 +248,10 @@ class WebSocketManager:
 
             async def send_to_client(connection):
                 try:
+                    if message_type == "audit_log":
+                        principal = self.connection_principals.get(connection)
+                        if not principal or principal.get("role") != "admin":
+                            return True, connection
                     if not await self._can_receive_namespace(connection, namespace):
                         return True, connection
                     await asyncio.wait_for(
@@ -278,6 +282,10 @@ class WebSocketManager:
             disconnected = []
             for connection in list(self.active_connections):
                 try:
+                    if message_type == "audit_log":
+                        principal = self.connection_principals.get(connection)
+                        if not principal or principal.get("role") != "admin":
+                            continue
                     if not await self._can_receive_namespace(connection, namespace):
                         continue
                     await connection.send_text(serialized)
@@ -295,6 +303,10 @@ class WebSocketManager:
     async def broadcast_pod_failure(self, failure: PodFailureResponse):
         """Broadcast new pod failure to all connected clients"""
         await self._broadcast("pod_failure", failure)
+
+    async def broadcast_audit_log(self, entry: dict):
+        """Broadcast a new audit log entry to admin WebSocket clients only."""
+        await self._broadcast("audit_log", entry)
 
     async def broadcast_pod_deleted(self, namespace: str, pod_name: str):
         """Broadcast pod deletion to all connected clients"""
