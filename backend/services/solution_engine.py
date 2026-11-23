@@ -160,6 +160,8 @@ class SolutionEngine:
                         api_key=c["api_key"],
                         model=c["model"],
                         base_url=c.get("base_url"),
+                        reasoning_effort=c.get("reasoning_effort"),
+                        proxy_url=c.get("proxy_url"),
                     )
                     new_providers[c["id"]] = p
                     if c["is_default"] and default_id is None:

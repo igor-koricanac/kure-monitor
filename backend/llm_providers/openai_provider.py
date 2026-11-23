@@ -12,8 +12,19 @@ class OpenAIProvider(LLMProvider):
     # Subclasses targeting OpenAI-compatible APIs can override this.
     API_URL = "https://api.openai.com/v1/chat/completions"
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None):
-        super().__init__(api_key=api_key, model=model, base_url=base_url)
+    def __init__(
+        self,
+        api_key: str,
+        model: str = None,
+        base_url: str = None,
+        reasoning_effort: Optional[str] = None,
+    ):
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            reasoning_effort=reasoning_effort,
+        )
         if self.base_url:
             self.API_URL = f"{self.base_url.rstrip('/')}/chat/completions"
 
@@ -61,11 +72,13 @@ class OpenAIProvider(LLMProvider):
             "max_tokens": 1000,
             "temperature": 0.1,
         }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
 
         try:
             session = await self._get_session()
             async with session.post(
-                self.API_URL, headers=headers, json=payload
+                self.API_URL, headers=headers, json=payload, **self._proxy_kwargs()
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
@@ -104,11 +117,13 @@ class OpenAIProvider(LLMProvider):
             "max_tokens": 2000,
             "temperature": 0.1,
         }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
 
         try:
             session = await self._get_session()
             async with session.post(
-                self.API_URL, headers=headers, json=payload
+                self.API_URL, headers=headers, json=payload, **self._proxy_kwargs()
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()

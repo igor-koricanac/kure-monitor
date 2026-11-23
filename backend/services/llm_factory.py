@@ -37,7 +37,9 @@ class LLMFactory:
         provider_name: str,
         api_key: str,
         model: Optional[str] = None,
-        base_url: Optional[str] = None
+        base_url: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        proxy_url: Optional[str] = None,
     ) -> LLMProvider:
         """Create an LLM provider instance"""
         provider_name = provider_name.lower()
@@ -52,7 +54,14 @@ class LLMFactory:
         kwargs = {"api_key": api_key, "model": model}
         if base_url:
             kwargs["base_url"] = base_url
-        return provider_class(**kwargs)
+        if reasoning_effort and issubclass(provider_class, OpenAIProvider):
+            kwargs["reasoning_effort"] = reasoning_effort
+        provider = provider_class(**kwargs)
+        if reasoning_effort:
+            provider.reasoning_effort = reasoning_effort.strip().lower() or None
+        if proxy_url:
+            provider.proxy_url = proxy_url.strip() or None
+        return provider
 
     @classmethod
     def get_supported_providers(self) -> list:

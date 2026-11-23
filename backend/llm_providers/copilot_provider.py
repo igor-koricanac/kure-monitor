@@ -20,14 +20,25 @@ class CopilotProvider(OpenAIProvider):
 
     DEFAULT_BASE_URL = "https://models.github.ai/inference"
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = None,
+        base_url: str = None,
+        reasoning_effort: str = None,
+    ):
         # Allow callers to override the base URL (e.g. for enterprise /
         # proxy endpoints); otherwise use the public GitHub Models URL.
         resolved_base = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         # Set API_URL per-instance so each provider instance can target a
         # different base URL without mutating the class attribute.
         self.API_URL = f"{resolved_base}/chat/completions"
-        super().__init__(api_key=api_key, model=model, base_url=resolved_base)
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=resolved_base,
+            reasoning_effort=reasoning_effort,
+        )
 
     @property
     def provider_name(self) -> str:

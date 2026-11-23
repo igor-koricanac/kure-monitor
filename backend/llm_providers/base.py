@@ -22,12 +22,27 @@ class LLMProvider(ABC):
     # Default total HTTP timeout (seconds) for LLM provider requests.
     REQUEST_TIMEOUT_SECONDS: float = 120.0
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = None,
+        base_url: str = None,
+        reasoning_effort: Optional[str] = None,
+        proxy_url: Optional[str] = None,
+    ):
         self.api_key = api_key
         self.model = model or self.default_model
         self.base_url = base_url
+        self.reasoning_effort = (reasoning_effort or "").strip().lower() or None
+        self.proxy_url = (proxy_url or "").strip() or None
         # Lazily created in an event loop on first use.
         self._session: Optional[aiohttp.ClientSession] = None
+
+    def _proxy_kwargs(self) -> Dict:
+        """Return aiohttp request kwargs for optional HTTP/HTTPS proxy."""
+        if not self.proxy_url:
+            return {}
+        return {"proxy": self.proxy_url}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Return a process-wide ClientSession for this provider, creating it lazily."""

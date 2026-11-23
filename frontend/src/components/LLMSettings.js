@@ -30,6 +30,8 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState('');
+  const [proxyUrl, setProxyUrl] = useState('');
   const [isCustomModelInput, setIsCustomModelInput] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -451,6 +453,8 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
     if (currentProvider?.needsBaseUrl && baseUrl) {
       payload.base_url = baseUrl;
     }
+    payload.reasoning_effort = reasoningEffort || null;
+    payload.proxy_url = proxyUrl.trim() || null;
     return payload;
   };
 
@@ -498,6 +502,8 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
         api_key: apiKey ? apiKey : null,
         model: payload.model,
         base_url: payload.base_url,
+        reasoning_effort: payload.reasoning_effort !== undefined ? payload.reasoning_effort : null,
+        proxy_url: payload.proxy_url !== undefined ? payload.proxy_url : null,
         is_default: payload.is_default,
       });
     } else {
@@ -515,6 +521,8 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
 
     setApiKey(''); // Clear API key from form after save
     setConfigName('');
+    setReasoningEffort('');
+    setProxyUrl('');
     setIsDefaultCheckbox(false);
     setIsEditing(false);
     setEditingConfigId(null);
@@ -556,6 +564,8 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
     setProvider(cfg.provider);
     setModel(cfg.model || '');
     setBaseUrl(cfg.base_url || '');
+    setReasoningEffort(cfg.reasoning_effort || '');
+    setProxyUrl(cfg.proxy_url || '');
     setApiKey('');
     setIsDefaultCheckbox(cfg.is_default);
     setShowAddForm(true);
@@ -886,6 +896,45 @@ const LLMSettings = ({ isDark = false, onConfigChange }) => {
               )}
             </div>
           )}
+
+          {/* Reasoning Effort - available for all providers */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              Reasoning Effort (Optional)
+            </label>
+            <select
+              value={reasoningEffort}
+              onChange={(e) => setReasoningEffort(e.target.value)}
+              data-testid="reasoning-effort-select"
+              className={`w-full px-3 py-2 text-sm border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-white border-gray-300 text-gray-900'}`}
+            >
+              <option value="">Default (Model default)</option>
+              <option value="low">Low (Faster, lower token usage)</option>
+              <option value="medium">Medium (Balanced)</option>
+              <option value="high">High (Deeper analysis)</option>
+            </select>
+            <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              Controls how much reasoning effort supported models use before answering.
+            </p>
+          </div>
+
+          {/* Proxy URL - optional for air-gapped / corporate proxy environments */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              HTTP/HTTPS Proxy URL (Optional)
+            </label>
+            <input
+              type="text"
+              value={proxyUrl}
+              onChange={(e) => setProxyUrl(e.target.value)}
+              data-testid="proxy-url-input"
+              placeholder="http://proxy.corp.local:8080 or http://user:pass@proxy:8080"
+              className={`w-full px-3 py-2 text-sm border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`}
+            />
+            <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              Route outbound LLM API requests through a proxy (supports embedded credentials: http://user:pass@host:port).
+            </p>
+          </div>
 
           {/* Model Select */}
           <div>

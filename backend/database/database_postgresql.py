@@ -436,6 +436,8 @@ class PostgreSQLDatabase(
                         api_key_encrypted VARCHAR(1000) NOT NULL,
                         model VARCHAR(100),
                         base_url VARCHAR(500),
+                        reasoning_effort VARCHAR(32),
+                        proxy_url VARCHAR(500),
                         is_default BOOLEAN NOT NULL DEFAULT FALSE,
                         is_active BOOLEAN NOT NULL DEFAULT TRUE,
                         priority INT NOT NULL DEFAULT 0,
@@ -450,6 +452,15 @@ class PostgreSQLDatabase(
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_llm_configs_active
                     ON llm_configs(is_active)
+                """)
+
+                await conn.execute("""
+                    ALTER TABLE llm_configs
+                    ADD COLUMN IF NOT EXISTS reasoning_effort VARCHAR(32)
+                """)
+                await conn.execute("""
+                    ALTER TABLE llm_configs
+                    ADD COLUMN IF NOT EXISTS proxy_url VARCHAR(500)
                 """)
 
                 # Migration: if legacy llm_config has a row and llm_configs is empty, migrate it

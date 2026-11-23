@@ -261,8 +261,8 @@ class Database:
     async def get_default_llm_config(self):
         return await self._db.get_default_llm_config()
 
-    async def save_llm_config_item(self, name: str, provider: str, api_key: str, model: str = None, base_url: str = None, is_default: bool = False):
-        return await self._db.save_llm_config_item(name, provider, api_key, model, base_url, is_default)
+    async def save_llm_config_item(self, name: str, provider: str, api_key: str, model: str = None, base_url: str = None, is_default: bool = False, reasoning_effort: str = None, proxy_url: str = None):
+        return await self._db.save_llm_config_item(name, provider, api_key, model, base_url, is_default, reasoning_effort=reasoning_effort, proxy_url=proxy_url)
 
     async def update_llm_config_item(self, config_id: int, **kwargs):
         return await self._db.update_llm_config_item(config_id, **kwargs)

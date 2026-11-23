@@ -224,6 +224,8 @@ class LLMConfigItemCreate(BaseModel):
     api_key: str
     model: Optional[str] = None
     base_url: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    proxy_url: Optional[str] = None
     is_default: Optional[bool] = False
 
 
@@ -233,6 +235,8 @@ class LLMConfigItemUpdate(BaseModel):
     api_key: Optional[str] = None  # None or empty means keep existing encrypted key
     model: Optional[str] = None
     base_url: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    proxy_url: Optional[str] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -243,6 +247,8 @@ class LLMConfigItemResponse(BaseModel):
     provider: str
     model: Optional[str] = None
     base_url: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    proxy_url: Optional[str] = None
     is_default: bool
     is_active: bool
     created_at: Optional[str] = None

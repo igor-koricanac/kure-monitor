@@ -163,6 +163,8 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                         provider=c["provider"],
                         model=c["model"],
                         base_url=c["base_url"],
+                        reasoning_effort=c.get("reasoning_effort"),
+                        proxy_url=c.get("proxy_url"),
                         is_default=c["is_default"],
                         is_active=c["is_active"],
                         created_at=c["created_at"],
@@ -198,6 +200,8 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 model=config.model,
                 base_url=config.base_url,
                 is_default=bool(config.is_default),
+                reasoning_effort=config.reasoning_effort,
+                proxy_url=config.proxy_url,
             )
 
             await solution_engine.reload_providers()
@@ -209,6 +213,8 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 provider=result["provider"],
                 model=result["model"],
                 base_url=result["base_url"],
+                reasoning_effort=result.get("reasoning_effort"),
+                proxy_url=result.get("proxy_url"),
                 is_default=result["is_default"],
                 is_active=result["is_active"],
                 created_at=result["created_at"],
@@ -231,6 +237,8 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 api_key=update.api_key,
                 model=update.model,
                 base_url=update.base_url,
+                reasoning_effort=update.reasoning_effort,
+                proxy_url=update.proxy_url,
                 is_default=update.is_default,
                 is_active=update.is_active,
             )
@@ -246,6 +254,8 @@ def create_llm_router(deps: RouterDeps) -> APIRouter:
                 provider=updated["provider"],
                 model=updated["model"],
                 base_url=updated["base_url"],
+                reasoning_effort=updated.get("reasoning_effort"),
+                proxy_url=updated.get("proxy_url"),
                 is_default=updated["is_default"],
                 is_active=updated["is_active"],
                 created_at=updated["created_at"],

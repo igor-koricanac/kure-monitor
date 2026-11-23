@@ -15,7 +15,7 @@ class LLMConfigMixin:
         """Get all registered LLM configs from llm_configs table"""
         async with self._acquire() as conn:
             query = """
-                SELECT id, name, provider, api_key_encrypted, model, base_url, is_default, is_active, priority, created_at, updated_at
+                SELECT id, name, provider, api_key_encrypted, model, base_url, reasoning_effort, proxy_url, is_default, is_active, priority, created_at, updated_at
                 FROM llm_configs
             """
             if active_only:
@@ -31,6 +31,8 @@ class LLMConfigMixin:
                     "api_key": decrypt(r["api_key_encrypted"]),
                     "model": r["model"],
                     "base_url": r["base_url"],
+                    "reasoning_effort": r["reasoning_effort"],
+                    "proxy_url": r["proxy_url"],
                     "is_default": r["is_default"],
                     "is_active": r["is_active"],
                     "priority": r["priority"],
@@ -45,7 +47,7 @@ class LLMConfigMixin:
         async with self._acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, name, provider, api_key_encrypted, model, base_url, is_default, is_active, priority, created_at, updated_at
+                SELECT id, name, provider, api_key_encrypted, model, base_url, reasoning_effort, proxy_url, is_default, is_active, priority, created_at, updated_at
                 FROM llm_configs WHERE id = $1
                 """,
                 config_id,
@@ -59,6 +61,8 @@ class LLMConfigMixin:
                 "api_key": decrypt(row["api_key_encrypted"]),
                 "model": row["model"],
                 "base_url": row["base_url"],
+                "reasoning_effort": row["reasoning_effort"],
+                "proxy_url": row["proxy_url"],
                 "is_default": row["is_default"],
                 "is_active": row["is_active"],
                 "priority": row["priority"],
@@ -71,7 +75,7 @@ class LLMConfigMixin:
         async with self._acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, name, provider, api_key_encrypted, model, base_url, is_default, is_active, priority, created_at, updated_at
+                SELECT id, name, provider, api_key_encrypted, model, base_url, reasoning_effort, proxy_url, is_default, is_active, priority, created_at, updated_at
                 FROM llm_configs
                 WHERE is_active = TRUE
                 ORDER BY is_default DESC, priority ASC, id ASC
@@ -87,6 +91,8 @@ class LLMConfigMixin:
                 "api_key": decrypt(row["api_key_encrypted"]),
                 "model": row["model"],
                 "base_url": row["base_url"],
+                "reasoning_effort": row["reasoning_effort"],
+                "proxy_url": row["proxy_url"],
                 "is_default": row["is_default"],
                 "is_active": row["is_active"],
                 "priority": row["priority"],
@@ -102,9 +108,13 @@ class LLMConfigMixin:
         model: Optional[str] = None,
         base_url: Optional[str] = None,
         is_default: bool = False,
+        reasoning_effort: Optional[str] = None,
+        proxy_url: Optional[str] = None,
     ) -> dict:
         """Register a new LLM configuration. If first one or is_default=True, sets as default."""
         encrypted_key = encrypt(api_key)
+        norm_effort = (reasoning_effort or "").strip().lower() or None
+        norm_proxy = (proxy_url or "").strip() or None
 
         async with self._acquire() as conn:
             count = await conn.fetchval("SELECT COUNT(*) FROM llm_configs")
@@ -115,15 +125,17 @@ class LLMConfigMixin:
 
             result = await conn.fetchrow(
                 """
-                INSERT INTO llm_configs (name, provider, api_key_encrypted, model, base_url, is_default, is_active, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, name, provider, model, base_url, is_default, is_active, created_at, updated_at
+                INSERT INTO llm_configs (name, provider, api_key_encrypted, model, base_url, reasoning_effort, proxy_url, is_default, is_active, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, name, provider, model, base_url, reasoning_effort, proxy_url, is_default, is_active, created_at, updated_at
                 """,
                 name,
                 provider,
                 encrypted_key,
                 model,
                 base_url,
+                norm_effort,
+                norm_proxy,
                 make_default,
             )
 
@@ -147,6 +159,8 @@ class LLMConfigMixin:
                 "provider": result["provider"],
                 "model": result["model"],
                 "base_url": result["base_url"],
+                "reasoning_effort": result["reasoning_effort"],
+                "proxy_url": result["proxy_url"],
                 "is_default": result["is_default"],
                 "is_active": result["is_active"],
                 "created_at": result["created_at"].isoformat() if result["created_at"] else None,
@@ -161,6 +175,8 @@ class LLMConfigMixin:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         base_url: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        proxy_url: Optional[str] = None,
         is_default: Optional[bool] = None,
         is_active: Optional[bool] = None,
     ) -> Optional[dict]:
@@ -175,6 +191,16 @@ class LLMConfigMixin:
             new_encrypted_key = encrypt(api_key) if (api_key and api_key.strip()) else existing["api_key_encrypted"]
             new_model = model if model is not None else existing["model"]
             new_base_url = base_url if base_url is not None else existing["base_url"]
+            new_reasoning_effort = (
+                (reasoning_effort.strip().lower() or None)
+                if reasoning_effort is not None
+                else existing["reasoning_effort"]
+            )
+            new_proxy_url = (
+                (proxy_url.strip() or None)
+                if proxy_url is not None
+                else existing["proxy_url"]
+            )
             new_active = is_active if is_active is not None else existing["is_active"]
             new_default = is_default if is_default is not None else existing["is_default"]
 
@@ -185,15 +211,17 @@ class LLMConfigMixin:
                 """
                 UPDATE llm_configs
                 SET name = $1, provider = $2, api_key_encrypted = $3, model = $4,
-                    base_url = $5, is_default = $6, is_active = $7, updated_at = CURRENT_TIMESTAMP
-                WHERE id = $8
-                RETURNING id, name, provider, model, base_url, is_default, is_active, created_at, updated_at
+                    base_url = $5, reasoning_effort = $6, proxy_url = $7, is_default = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $10
+                RETURNING id, name, provider, model, base_url, reasoning_effort, proxy_url, is_default, is_active, created_at, updated_at
                 """,
                 new_name,
                 new_provider,
                 new_encrypted_key,
                 new_model,
                 new_base_url,
+                new_reasoning_effort,
+                new_proxy_url,
                 new_default,
                 new_active,
                 config_id,
@@ -219,6 +247,8 @@ class LLMConfigMixin:
                 "provider": result["provider"],
                 "model": result["model"],
                 "base_url": result["base_url"],
+                "reasoning_effort": result["reasoning_effort"],
+                "proxy_url": result["proxy_url"],
                 "is_default": result["is_default"],
                 "is_active": result["is_active"],
                 "created_at": result["created_at"].isoformat() if result["created_at"] else None,
