@@ -450,6 +450,59 @@ export const api = {
     provider: 'copilot',
     model: 'openai/gpt-5.5-mini',
   }),
+  generateLogAwareSolution: async (id) => {
+    const pod = mockFailedPods.find((p) => p.id === id);
+    const name = pod?.pod_name || `pod-${id}`;
+    const ns = pod?.namespace || 'default';
+    const reason = pod?.failure_reason || 'CrashLoopBackOff';
+    const generatedAt = new Date().toISOString();
+
+    let solution;
+    if (reason === 'OOMKilled') {
+      solution = `## Log-Aware Diagnosis for \`${name}\`
+
+### Root Cause from Container Logs
+The container logs show heap allocation spiking sharply right before **SIGKILL (Exit Code 137)** during batch payload deserialization:
+- Peak resident memory exceeded the container's \`256Mi\` cgroup limit.
+- No graceful shutdown hook completed because the Linux OOM killer terminated PID 1 immediately.
+
+### Recommended Remediation
+1. **Increase memory limits** in \`${ns}/${name}\` from \`256Mi\` to \`512Mi\` (and requests to \`256Mi\`).
+2. **Stream large payloads** instead of buffering full JSON arrays in memory.
+3. **Verify safely**: Click **Test Fix** to deploy a temporary Mirror Pod with the updated memory limit before patching production.`;
+    } else if (reason === 'CrashLoopBackOff') {
+      solution = `## Log-Aware Diagnosis for \`${name}\`
+
+### Root Cause from Container Logs
+Inspecting the crashed container's previous stdout/stderr reveals a fatal startup error:
+- The process exited with **Exit Code 1** immediately after attempting to initialize its upstream connection / configuration.
+- Repeated restarts (\`CrashLoopBackOff\`) confirm the failure is deterministic rather than transient.
+
+### Recommended Remediation
+1. **Verify environment variables & mounted ConfigMaps** referenced in the error stack trace.
+2. **Check upstream service reachability** from namespace \`${ns}\` (DNS + NetworkPolicy).
+3. **Test the patch safely**: Use **Test Fix** to spin up a Mirror Pod and confirm the container reaches \`Running (1/1 Ready)\`.`;
+    } else {
+      solution = `## Log-Aware Diagnosis for \`${name}\`
+
+### Root Cause from Container Logs
+Analysis of the captured logs and Kubernetes events for \`${ns}/${name}\` (\`${reason}\`) indicates a container-level runtime misconfiguration.
+
+### Recommended Remediation
+1. Review the highlighted error lines in the **Logs** viewer.
+2. Apply the suggested manifest changes and validate them using **Test Fix** (Mirror Pod).`;
+    }
+
+    if (pod) {
+      pod.log_aware_solution = solution;
+      pod.log_aware_solution_generated_at = generatedAt;
+    }
+    recordDemoAudit('pod.troubleshoot', 'pod_failure', `${ns}/${name}`);
+    return { solution, generated_at: generatedAt };
+  },
+  regenerateLogAwareSolution: async (id) => {
+    return api.generateLogAwareSolution(id);
+  },
   getPodManifest: async (ns, name) => {
     const found = mockFailedPods.find((p) => p.namespace === ns && p.pod_name === name);
     return { manifest: found?.manifest || `apiVersion: v1\nkind: Pod\nmetadata:\n  name: ${name}\n  namespace: ${ns}` };
