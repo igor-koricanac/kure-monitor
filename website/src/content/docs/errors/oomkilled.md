@@ -7,6 +7,8 @@ description: Complete guide to troubleshooting Kubernetes OOMKilled containers a
 
 When a container hits its memory limit, it is instantly killed without warning. This often results in dropped connections and data corruption.
 
+![AI-powered OOMKilled pod diagnosis](/images/pod_details.png)
+
 ## What causes OOMKilled?
 
 Unlike CPU limits (which throttle the container), memory limits are strictly enforced. Common causes include:

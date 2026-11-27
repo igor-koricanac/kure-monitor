@@ -20,6 +20,12 @@ Deploy a temporary copy of a failing pod. Manually edit the manifest and deploy 
 
 ![Mirror Pod](docs/images/mirror-pod.gif)
 
+### Interactive Topology Diagram
+
+Visualize every workload, Service, Ingress, NetworkPolicy, ConfigMap, and Secret in a namespace with Horizontal/Vertical layout, orthogonal edges, **Find node...** jump-to search, **Core Only** filtering, and an interactive MiniMap.
+
+![Interactive Topology Diagram](docs/images/diagram.png)
+
 ## Why Kure?
 
 Unlike tools such as K8sGPT that are CLI-focused, Kure gives you a unified web dashboard combining real-time failure diagnosis, security scanning, and AI-powered fixes in one place. It also supports Ollama for fully local, air-gapped LLM inference — so your cluster data never leaves your network.

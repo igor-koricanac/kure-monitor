@@ -7,6 +7,8 @@ description: Fix Kubernetes ImagePullBackOff and ErrImagePull errors. Step-by-st
 
 When a pod is stuck in `ImagePullBackOff`, the container will never start.
 
+![Real-time ImagePullBackOff detection in Kure Monitor](/images/pod_list.png)
+
 ## What causes ImagePullBackOff?
 
 The kubelet failed to retrieve the image for one of these common reasons:

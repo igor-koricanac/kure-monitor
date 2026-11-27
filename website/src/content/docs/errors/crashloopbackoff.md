@@ -7,6 +7,8 @@ description: Step-by-step troubleshooting guide for Kubernetes CrashLoopBackOff.
 
 Because Kubernetes implements an exponential backoff delay (10s, 20s, 40s, up to 5 minutes) between restart attempts, your pod gets stuck in a loop.
 
+![Log-aware AI troubleshooting for CrashLoopBackOff](/images/log-aware-troubleshoot.png)
+
 ## What causes CrashLoopBackOff?
 
 A container crashes when its main process exits. Common reasons include:

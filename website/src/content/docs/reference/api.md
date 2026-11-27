@@ -42,9 +42,14 @@ GET /api/pods/{namespace}/{pod_name}/logs/stream?token=YOUR_SERVICE_TOKEN
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /health`, `GET /metrics` | Liveness / Prometheus scrape |
-| `GET /api/auth/status` | Whether initial admin setup is needed |
+| `GET /api/auth/setup-required` | Whether initial admin setup is needed |
+| `POST /api/auth/setup` | Create the initial admin (only when no users exist) |
 | `POST /api/auth/login` | Log in with username + password |
-| `POST /api/auth/signup` | Create the initial admin (only when no users exist) |
+| `GET /api/auth/sso/config` | Public SSO / OIDC login availability |
+| `GET /api/auth/sso/login` | Start OIDC authorization redirect |
+| `GET /api/auth/sso/callback` | OIDC callback handler |
+| `GET /api/auth/invitation/{token}` | Validate user invitation token |
+| `POST /api/auth/accept-invitation` | Accept invitation and set password |
 | `POST /api/chatops/slack/*` | External webhook for Slack interactivity |
 | `POST /api/chatops/teams/*` | External webhook for Teams interactivity |
 
@@ -54,6 +59,7 @@ GET /api/pods/{namespace}/{pod_name}/logs/stream?token=YOUR_SERVICE_TOKEN
 |----------|--------|
 | `POST /api/pods/failed` | Agent |
 | `POST /api/pods/dismiss-deleted` | Agent |
+| `POST /api/advice/findings` | Agent |
 | `POST /api/security/findings` | Scanner |
 | `POST /api/security/scan/clear` | Scanner |
 | `POST /api/security/rescan-status` | Scanner |
@@ -74,38 +80,43 @@ GET /api/pods/{namespace}/{pod_name}/logs/stream?token=YOUR_SERVICE_TOKEN
 | Category | Endpoint | Description |
 |----------|----------|-------------|
 | Config | `GET /config` | App status |
-| Pods | `POST /pods/failed` | Report failure |
-| Pods | `GET /pods/failed` | List active failures |
-| Pods | `GET /pods/history` | List resolved pods |
-| Pods | `GET /pods/ignored` | List ignored pods |
+| Auth | `GET /auth/setup-required`, `POST /auth/setup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Session authentication |
+| Auth (SSO) | `GET /auth/sso/config`, `GET /auth/sso/login`, `GET /auth/sso/callback` | OIDC / Keycloak SSO login |
+| Auth (Invites) | `GET /auth/invitation/{token}`, `POST /auth/accept-invitation` | User invitation onboarding |
+| Pods | `POST /pods/failed` | Report failure (Agent) |
+| Pods | `GET /pods/failed`, `GET /pods/live` | List active failures / live cluster pods |
+| Pods | `GET /pods/history`, `GET /pods/ignored` | List resolved / ignored pods |
 | Pods | `PUT /pods/{id}/status` | Update status |
-| Pods | `DELETE /pods/failed/{id}` | Dismiss |
+| Pods | `DELETE /pods/failed/{id}` | Dismiss failure |
 | Pods | `POST /pods/failed/{id}/retry-solution` | Regenerate AI solution |
-| Pods | `GET /pods/{ns}/{name}/logs` | Get logs |
-| Security | `POST /security/findings` | Report finding |
-| Security | `GET /security/findings` | List findings |
-| Security | `POST /security/findings/{id}/fix` | Generate AI fix |
-| Security | `GET / POST / DELETE /security/trusted-registries` | Manage trusted registries |
-| Advice | `GET /advice/findings` | List active advice |
-| Advice | `POST /advice/findings/{id}/explain` | Lazy AI explanation |
-| Advice | `PUT /advice/findings/{id}/ignore` | Suppress finding |
-| Advice | `GET /advice/detectors` | List available detectors |
-| ChatOps | `POST /chatops/slack/events` | Slack URL Verification & Events |
-| ChatOps | `POST /chatops/slack/interact` | Slack Interactive Buttons |
-| ChatOps | `POST /chatops/teams/interact` | MS Teams Interactive Buttons |
-| Mirror | `POST /mirror/preview/{id}` | Generate fixed manifest |
-| Mirror | `POST /mirror/deploy/{id}` | Deploy mirror pod |
-| Mirror | `GET /mirror/status/{id}` | Mirror status |
-| Mirror | `DELETE /mirror/{id}` | Delete mirror |
-| Mirror | `GET /mirror/active` | List active mirrors |
-| Diagram | `GET /diagram/namespaces` | List namespaces |
-| Diagram | `GET /diagram/namespace/{ns}` | Per-namespace graph |
-| Diagram | `GET /diagram/workload/{ns}/{kind}/{name}` | Per-workload graph |
+| Pods | `POST /pods/failed/{id}/troubleshoot` | Log-aware AI troubleshooting |
+| Pods | `GET /pods/{ns}/{name}/manifest` | Get live pod YAML manifest |
+| Pods | `GET /pods/{ns}/{name}/logs`, `GET /pods/{ns}/{name}/logs/stream` | Fetch or stream (SSE) pod logs |
+| Security | `POST /security/findings`, `GET /security/findings` | Report / list findings |
+| Security | `GET /security/findings/{id}/manifest` | Get workload YAML manifest for finding |
+| Security | `POST /security/findings/{id}/fix` | Generate AI fix & diff |
+| Security | `POST /security/rescan` | Trigger on-demand security rescan |
+| Advice | `POST /advice/findings`, `GET /advice/findings`, `GET /advice/findings/export` | Report, list, or export advice findings |
+| Advice | `GET /advice/findings/{id}`, `POST /advice/findings/{id}/explain` | Finding details & lazy AI explanation |
+| Advice | `PUT /advice/findings/{id}/ignore`, `DELETE /advice/findings/{id}` | Ignore or delete advice finding |
+| Advice | `GET /advice/detectors`, `PUT /advice/detectors/{detector_id}` | List or configure advice detectors |
+| Chat | `POST /chat`, `GET /chat/history`, `GET /chat/sessions`, `DELETE /chat/history` | Interactive AI troubleshooting chat |
+| ChatOps | `POST /chatops/slack/events`, `POST /chatops/slack/interact`, `POST /chatops/teams/interact` | Slack & MS Teams webhooks |
+| Mirror | `POST /mirror/preview/{id}`, `POST /mirror/deploy/{id}` | Generate fixed manifest & deploy mirror pod |
+| Mirror | `GET /mirror/status/{id}`, `DELETE /mirror/{id}`, `GET /mirror/active` | Mirror status, cleanup, active list |
+| Diagram | `GET /diagram/namespaces`, `GET /diagram/namespace/{ns}` | Namespaces & per-namespace graph |
+| Diagram | `GET /diagram/workloads/{ns}/{kind}`, `GET /diagram/workload/{ns}/{kind}/{name}` | Workloads list & per-workload graph |
+| Diagram | `GET /diagram/roles`, `GET /diagram/role/{ns}/{name}`, `GET /diagram/clusterrole/{name}` | RBAC roles & permission graphs |
 | Diagram | `GET /diagram/manifest/{ns}/{kind}/{name}` | Live manifest (rejects `Secret` with 403) |
-| Admin | `GET / POST / DELETE /admin/llm/*` | LLM config |
-| Admin | `GET / POST / DELETE /admin/excluded-*` | Suppressions |
-| Admin | `GET / POST / PUT / DELETE /admin/notifications` | Notifications |
-| Admin | `GET / POST /admin/settings/*` | App settings |
+| LLM | `GET /llm/available` | List available LLM configs for UI selector |
+| Admin (LLM) | `GET / POST / PUT / DELETE /admin/llm/configs*`, `/admin/llm/instructions`, `/admin/llm-discovery` | Multi-LLM configs, custom instructions, discovery |
+| Admin (Users) | `GET / PATCH / DELETE /admin/users*`, `GET / POST / DELETE /admin/invitations*` | User & invitation management |
+| Admin (Teams) | `GET / POST / PUT / DELETE /admin/teams*`, `GET /admin/cluster-namespaces` | Team RBAC, namespace & tab scoping |
+| Admin (SSO) | `GET / POST /admin/sso/config` | Configure OIDC / Keycloak SSO |
+| Admin (Audit) | `GET /admin/audit-logs`, `GET /admin/audit-logs/export`, `GET / PUT /admin/audit-logs/retention` | Admin-only audit log & retention |
+| Admin (Rules) | `GET / POST / DELETE /admin/excluded-*`, `/admin/trusted-registries` | Namespace/pod/rule suppressions & registries |
+| Admin (Notify) | `GET / POST / PUT / DELETE /admin/notifications*` | Slack / MS Teams notifications |
+| Admin (Settings) | `GET / POST /admin/settings/*` | App settings (e.g. mirror TTL) |
 
 ## Pod monitoring
 
@@ -180,11 +191,23 @@ DELETE /api/pods/failed/{pod_id}
 PUT /api/pods/ignored/{pod_id}/restore
 ```
 
-### Retry AI
+### Retry AI / Log-aware troubleshooting
 
 ```http
 POST /api/pods/failed/{pod_id}/retry-solution
+POST /api/pods/failed/{pod_id}/troubleshoot
 ```
+
+`troubleshoot` fetches fresh container logs and runs a targeted AI root-cause analysis (supports selecting a specific `llm_config_id`).
+
+### Live pods & pod manifest
+
+```http
+GET /api/pods/live
+GET /api/pods/{namespace}/{pod_name}/manifest
+```
+
+Returns live cluster pods (scoped to the user's team namespaces) or a pod's live YAML manifest.
 
 ### Get logs
 
@@ -232,20 +255,48 @@ POST   /api/security/scan/clear
 DELETE /api/security/findings/resource/{type}/{ns}/{name}
 ```
 
-### Generate AI fix
+### Get manifest / Generate AI fix / Trigger rescan
 
 ```http
+GET  /api/security/findings/{id}/manifest
 POST /api/security/findings/{id}/fix
+POST /api/security/rescan
 ```
 
-Returns the LLM-generated remediation.
+- `manifest` returns the live workload YAML for the finding.
+- `fix` returns the LLM-generated fixed YAML and unified red/green diff lines.
+- `rescan` triggers an on-demand cluster security scan (requires `write` role).
 
 ### Trusted registries
 
 ```http
-GET    /api/security/trusted-registries
-POST   /api/security/trusted-registries  { "registry": "..." }
-DELETE /api/security/trusted-registries/{registry}
+GET    /api/admin/trusted-registries
+POST   /api/admin/trusted-registries  { "registry": "..." }
+DELETE /api/admin/trusted-registries/{registry}
+```
+
+## AI Advice
+
+```http
+POST   /api/advice/findings                   # Agent ingest (X-Service-Token)
+GET    /api/advice/findings                   # List active advice findings
+GET    /api/advice/findings/export            # Export findings (CSV / JSON)
+GET    /api/advice/findings/{finding_id}      # Get single finding
+POST   /api/advice/findings/{finding_id}/explain  # Generate lazy AI explanation
+PUT    /api/advice/findings/{finding_id}/ignore   # Suppress finding
+DELETE /api/advice/findings/{finding_id}      # Delete finding
+
+GET    /api/advice/detectors                  # List detectors and status
+PUT    /api/advice/detectors/{detector_id}    # Enable/disable or configure detector (Admin)
+```
+
+## AI Chat
+
+```http
+POST   /api/chat                              # Send a prompt with optional pod/cluster context
+GET    /api/chat/sessions                     # List chat sessions
+GET    /api/chat/history                      # Fetch messages for a session
+DELETE /api/chat/history                      # Clear chat history
 ```
 
 ## Mirror Pod Testing
@@ -336,9 +387,10 @@ GET /api/diagram/namespace/{namespace}
 }
 ```
 
-### Per-workload graph
+### List workloads / Per-workload graph
 
 ```http
+GET /api/diagram/workloads/{namespace}/{kind}
 GET /api/diagram/workload/{namespace}/{kind}/{name}
 ```
 
@@ -387,27 +439,92 @@ GET /api/diagram/clusterrole/{name}
 
 Same shape as the per-Role graph but for ClusterRoles + ClusterRoleBindings.
 
-## Admin — LLM
+## Admin — LLM, Multi-LLM & Custom Instructions
 
 ```http
+# Legacy single-config endpoints
 GET    /api/admin/llm/status
 POST   /api/admin/llm/config   { "provider": "...", "api_key": "...", "model": "..." }
 POST   /api/admin/llm/test     { "provider": "...", "api_key": "...", "model": "..." }
 DELETE /api/admin/llm/config
+
+# Multi-LLM configurations (supports optional proxy_url & reasoning_effort)
+GET    /api/llm/available
+GET    /api/admin/llm/configs
+POST   /api/admin/llm/configs
+PUT    /api/admin/llm/configs/{config_id}
+DELETE /api/admin/llm/configs/{config_id}
+POST   /api/admin/llm/configs/{config_id}/default
+POST   /api/admin/llm/configs/{config_id}/test
+GET    /api/admin/llm-discovery
+
+# Custom AI instructions
+GET    /api/admin/llm/instructions
+PUT    /api/admin/llm/instructions
+DELETE /api/admin/llm/instructions
 ```
 
-See [LLM Providers](/configuration/llm-providers/) for supported provider/model combinations.
+See [LLM Providers](/configuration/llm-providers/) and [Multi-LLM Support](/features/multi-llm/) for supported provider/model combinations.
+
+## Admin — Users, Invitations & Teams (RBAC)
+
+```http
+# Users & invitations
+GET    /api/admin/users
+PATCH  /api/admin/users/{user_id}
+DELETE /api/admin/users/{user_id}
+GET    /api/admin/invitations
+POST   /api/admin/invitations
+DELETE /api/admin/invitations/{invitation_id}
+
+# Teams & namespace/tab scoping
+GET    /api/admin/cluster-namespaces
+GET    /api/admin/teams
+POST   /api/admin/teams
+GET    /api/admin/teams/{team_id}
+PUT    /api/admin/teams/{team_id}
+DELETE /api/admin/teams/{team_id}
+POST   /api/admin/teams/{team_id}/members
+DELETE /api/admin/teams/{team_id}/members/{user_id}
+```
+
+## Admin — SSO / OIDC
+
+```http
+GET    /api/admin/sso/config
+POST   /api/admin/sso/config
+```
+
+Configures OIDC / Keycloak issuer URL, client ID/secret, redirect URI, and group-to-team mappings.
+
+## Admin — Audit Logs
+
+> Added in **2.6.3**. Strictly admin-only.
+
+```http
+GET /api/admin/audit-logs             # Filter by action, actor, resource_type, date range
+GET /api/admin/audit-logs/export      # Export as CSV or JSON
+GET /api/admin/audit-logs/retention   # Get retention period (days)
+PUT /api/admin/audit-logs/retention   # Update retention period
+```
 
 ## Admin — Exclusions
 
 ```http
+GET    /api/admin/namespaces
 GET    /api/admin/excluded-namespaces
 POST   /api/admin/excluded-namespaces   { "namespace": "kube-system" }
 DELETE /api/admin/excluded-namespaces/{namespace}
 
+GET    /api/admin/monitored-pods
 GET    /api/admin/excluded-pods
 POST   /api/admin/excluded-pods         { "pod_name": "test-*" }
 DELETE /api/admin/excluded-pods/{pod_name}
+
+GET    /api/admin/rule-titles
+GET    /api/admin/excluded-rules
+POST   /api/admin/excluded-rules        { "rule_title": "..." }
+DELETE /api/admin/excluded-rules/{rule_title}
 ```
 
 ## Admin — Notifications
@@ -458,6 +575,8 @@ Push messages from the backend:
 { "type": "trusted_registry_change", "data": { "registry": "...", "action": "added" } }
 { "type": "pod_status_change", "data": { "id": 1, "status": "investigating" } }
 { "type": "security_rescan_status", "data": { "status": "started", "reason": "trusted_registry_change" } }
+{ "type": "advice_finding", "data": { "id": 1, "detector": "missing_pdb", "severity": "medium" } }
+{ "type": "audit_log", "data": { "id": 42, "actor": "admin", "action": "llm.config.update" } }
 ```
 
 ## Error responses

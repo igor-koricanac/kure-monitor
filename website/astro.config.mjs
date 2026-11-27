@@ -39,7 +39,7 @@ export default defineConfig({
               tag: 'meta',
               attrs: {
                   property: 'og:image',
-                  content: 'https://kuremonitor.com/images/og-image.png'
+                  content: 'https://kuremonitor.com/images/og-image.png?v=2'
               }
           },
           {
@@ -67,7 +67,7 @@ export default defineConfig({
               tag: 'meta',
               attrs: {
                   name: 'twitter:image',
-                  content: 'https://kuremonitor.com/images/og-image.png'
+                  content: 'https://kuremonitor.com/images/og-image.png?v=2'
               }
           },
           {

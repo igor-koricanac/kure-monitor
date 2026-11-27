@@ -5,6 +5,10 @@ description: 50+ Kubernetes security checks with AI-generated remediation, trust
 
 The security scanner is a separate Deployment that audits every pod in your cluster on a schedule and on demand. Findings are scored by severity and surfaced on the **Security** tab.
 
+![Security Scanner findings list](/images/security_scan_list.png)
+
+![AI-generated security fix proposal](/images/security_fix_proposal.png)
+
 ## Sample checks
 
 | Check | Severity | Description |

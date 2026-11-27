@@ -5,6 +5,8 @@ description: Kure Monitor's proactive AI Advice engine with 38+ detectors for hy
 
 The **AI Advice** tab is the newest and most proactive feature in Kure Monitor. While normal pod monitoring waits for a pod to crash, the Advice engine scans your healthy and running workloads to find architectural, scheduling, and hygiene issues *before* they cause outages.
 
+![AI Advice in action](/images/ai-advice.gif)
+
 ## How it works
 
 Kure Monitor currently ships with **38+ advice detectors** covering:

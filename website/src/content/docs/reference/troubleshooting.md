@@ -34,7 +34,7 @@ kubectl get pvc -n kure-system
 ### Image pull errors
 
 ```bash
-docker pull ghcr.io/igor-koricanac/kure-monitor/backend:2.4.0
+docker pull ghcr.io/igor-koricanac/kure-monitor/backend:2.6.3
 
 # Private registry
 kubectl create secret docker-registry regcred \
@@ -93,6 +93,22 @@ If you see 401, the service token in the agent/scanner pod doesn't match the bac
 - Confirm you're logged in
 - Check browser console for WebSocket errors
 - Confirm the session cookie exists
+
+### SSO / OIDC login fails or loops back to login
+
+- **Redirect URI mismatch**: Ensure the callback URL configured in Keycloak / Okta / Azure AD matches `https://<your-kure-host>/api/auth/sso/callback` exactly.
+- **Issuer URL unreachable**: Confirm the backend pod can reach the OIDC discovery endpoint (`<issuer>/.well-known/openid-configuration`).
+- **Users land with no visible tabs or namespaces**: Check **Admin → Teams** and verify the user (or their OIDC group) is assigned to a team with allowed tabs and namespaces.
+
+### Multi-replica backend session or WebSocket desync
+
+When running 2–3 backend replicas (2.6.3+):
+- Confirm all replicas mount the same `<release>-bootstrap` Secret so `session-secret` is identical across pods.
+- Real-time updates sync across replicas via PostgreSQL `LISTEN/NOTIFY`. If UI updates only appear on refresh, check backend logs for `LISTEN` or database connection errors:
+
+```bash
+kubectl logs -n kure-system -l app=kure-backend | grep -iE "listen|notify|websocket"
+```
 
 ## Dashboard issues
 
@@ -170,6 +186,11 @@ kubectl logs -n kure-system -l app=kure-backend | grep -i llm
 
 If LLM fails, Kure falls back to rule-based solutions. Generic but functional.
 
+### Corporate proxy or Reasoning Effort errors
+
+- **HTTP/HTTPS Proxy**: If your cluster requires an outbound proxy to reach OpenAI/Anthropic/Gemini/Copilot, set the optional **HTTP/HTTPS Proxy URL** in **Admin → AI Configuration** (`http://proxy.corp:8080`). Proxy credentials are automatically redacted from logs and audit records.
+- **Reasoning Effort rejected**: Some older or non-reasoning models reject the `reasoning_effort` parameter. Leave **Reasoning Effort** blank unless using a supported reasoning model (e.g., `o3`, `o4-mini`, `gpt-5`).
+
 ## Security scanner issues
 
 ### No security findings
@@ -189,6 +210,21 @@ Add to **Admin → Suppressions**:
 - `kube-public`
 - `kube-node-lease`
 - `kure-system`
+
+## Topology Diagram, AI Advice & Audit Log issues
+
+### `403 Forbidden` when viewing a Secret in Topology Diagram
+
+This is intentional by design — the backend ServiceAccount has no read access to Kubernetes `Secret` objects.
+
+### No AI Advice findings showing
+
+- Check **Admin → Advice Detectors** to confirm the desired detectors are enabled.
+- Verify the `kure-agent` DaemonSet is running and healthy (`kubectl logs -n kure-system -l app=kure-agent`).
+
+### Audit Log tab missing or `403 Forbidden`
+
+The Audit Log (2.6.3+) is strictly **admin-only**. Non-admin users cannot view or export audit records. Retention is controlled via `auditLog.retentionDays` in Helm values or **Admin → Audit Log**.
 
 ## Mirror pod issues
 

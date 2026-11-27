@@ -7,6 +7,8 @@ Mirror Pod Testing lets you deploy a **temporary copy** of a failing pod with th
 
 This closes the gap between "the AI says do X" and "I merged the fix into git" — you can verify the fix works in your real cluster, with your real config, before touching source control.
 
+![Mirror Pod Testing demo](/images/mirror-pod.gif)
+
 ## How it works
 
 1. Expand a failing pod and click **Test Fix**

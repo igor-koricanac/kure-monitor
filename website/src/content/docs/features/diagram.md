@@ -7,6 +7,8 @@ description: Interactive Kubernetes topology graph — per-namespace and per-wor
 
 The **Diagram** tab renders an interactive Kubernetes topology graph computed deterministically from live cluster state by the backend. It's read-only and is intended for understanding how a workload fits into the rest of the namespace — which Service routes to it, which Ingress backs it, which HPA scales it, which ConfigMaps / Secrets / PVCs / ServiceAccounts it depends on, which NetworkPolicies select it.
 
+![Interactive Topology Diagram](/images/diagram.png)
+
 ## Modes
 
 ### Per-namespace

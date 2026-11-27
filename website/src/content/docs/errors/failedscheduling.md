@@ -7,6 +7,8 @@ description: Complete troubleshooting guide for Kubernetes FailedScheduling and 
 
 When a pod triggers `FailedScheduling`, it remains stuck in the `Pending` state indefinitely until cluster resources change or scheduling constraints are relaxed.
 
+![Real-time FailedScheduling diagnosis in Kure Monitor](/images/demo.gif)
+
 ---
 
 ## What Causes FailedScheduling?

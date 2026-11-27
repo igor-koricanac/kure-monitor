@@ -84,6 +84,24 @@ Click a finding and Kure proposes a concrete manifest fix — you review the dif
   description="Full check list, exclusions, and how to wire it into CI."
 />
 
+## Interactive topology diagram
+
+Visualize every workload, Service, Ingress, NetworkPolicy, ConfigMap, and Secret in a namespace with Horizontal/Vertical layout, orthogonal edges, **Find node...** jump-to search, **Core Only** filtering, and an interactive MiniMap.
+
+![Interactive topology diagram](/showcase/diagram.png)
+
+<LinkCard
+  title="Topology diagram →"
+  href="/features/diagram/"
+  description="Explore namespace graphs, workload graphs, and RBAC visualizations."
+/>
+
+## Admin-only audit log
+
+Track every administrative and user mutation (dismissing pod failures, editing LLM configs, updating trusted registries, managing teams) with real-time WebSocket streaming, structured JSON stdout logs, CSV/JSON export, and configurable retention.
+
+![Admin-only audit log](/showcase/audit_log.png)
+
 ## Mirror-pod testing
 
 Deploy a temporary copy of a failing pod with the proposed fix applied. Verify it works before committing to git.

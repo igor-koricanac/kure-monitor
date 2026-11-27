@@ -5,6 +5,8 @@ description: A tour of every feature in Kure Monitor — pod monitoring, securit
 
 Kure Monitor's dashboard is organized into tabs. Each tab is documented in detail below.
 
+![Kure Monitor Dashboard Demo](/images/demo.gif)
+
 All four features can be individually enabled or disabled at install time via the `features.*` Helm values — see [Helm Values → Feature toggles](/configuration/helm-values/#feature-toggles). Disabling a feature hides its tab and, for Pod Monitoring and Security Scanning, also skips deploying the corresponding workloads and RBAC.
 
 | Feature | What it does |

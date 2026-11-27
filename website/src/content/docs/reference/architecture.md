@@ -7,37 +7,7 @@ Kure Monitor ships five components that together provide failure detection, secu
 
 ## System overview
 
-```
-                                    ┌─────────────────────────┐
-                                    │     LLM Providers       │
-                                    │  OpenAI / Anthropic /   │
-                                    │  Groq / Gemini /        │
-                                    │  Copilot / Ollama       │
-                                    └───────────▲─────────────┘
-                                                │
-┌─────────────────┐                             │
-│  Kure Agent     │    ┌──────────────────────────────────────┐
-│  (DaemonSet)    │───>│          Kure Backend                │
-│                 │    │          (FastAPI)                   │
-│  - Pod Monitor  │    │                                      │
-│                 │    │  - REST API                          │
-└─────────────────┘    │  - WebSocket Server                  │
-        │              │  - Solution Engine                   │
-        │              │  - LLM Integration                   │
-        │              └──────────────────────────────────────┘
-        │                      │                    │
-        v                      v                    v
-┌─────────────────┐    ┌──────────────┐    ┌──────────────────┐
-│  Kubernetes     │    │  PostgreSQL  │    │  Kure Frontend   │
-│  API Server     │    │  Database    │    │  (React)         │
-└─────────────────┘    └──────────────┘    └──────────────────┘
-        ^                                          │
-        │                                          │
-┌─────────────────┐                                │
-│ Security Scanner│                                │
-│ (Deployment)    │────────────────────────────────┘
-└─────────────────┘         WebSocket Updates
-```
+![Kure Monitor System Architecture](/images/architecture.svg)
 
 ## Components
 
@@ -73,17 +43,26 @@ The brain. Receives reports, generates AI solutions, stores results, broadcasts 
 
 ```
 /api
-├── /auth                       # status, login, signup, me
-├── /pods                       # failures, history, ignored, logs, mirror
+├── /auth                       # setup, login, logout, me, SSO/OIDC, invitations
+├── /pods                       # failures, live, history, ignored, logs, manifest, troubleshoot
 ├── /mirror                     # preview, deploy, status, delete, active
-├── /security                   # findings, fixes, trusted registries
-├── /diagram                    # namespaces, namespace graph, workload graph, manifest
+├── /security                   # findings, manifest, AI fixes, rescan
+├── /advice                     # findings, export, lazy AI explain, detectors
+├── /chat                       # AI chat, history, sessions
+├── /chatops                    # Slack & MS Teams webhooks
+├── /diagram                    # namespaces, namespace/workload/RBAC graphs, manifest
+├── /llm/available              # user-facing available LLM configs
 ├── /admin
-│   ├── /llm                    # LLM config + test
-│   ├── /excluded-*             # suppressions
+│   ├── /llm/*                  # multi-LLM configs, default, test, custom instructions
+│   ├── /users & /invitations   # user & invitation management
+│   ├── /teams                  # teams, members, namespace & tab RBAC
+│   ├── /sso/config             # OIDC / Keycloak SSO configuration
+│   ├── /audit-logs             # admin-only audit log query, export, retention
+│   ├── /excluded-*             # namespace, pod, and rule suppressions
+│   ├── /trusted-registries     # trusted image registries
 │   ├── /notifications          # Slack / Teams
-│   └── /settings/*             # mirror TTL
-└── /ws                         # WebSocket
+│   └── /settings/*             # mirror TTL & app settings
+└── /ws                         # WebSocket (real-time UI + admin audit stream)
 ```
 
 See the full [API Reference](/reference/api/).
@@ -110,12 +89,14 @@ Persistent storage for failures, security findings, admin settings, exclusions.
 
 | Table | Description |
 |-------|-------------|
-| `failed_pods` | Pod failure records with solutions |
-| `security_issues` | Security scan results |
-| `admin_config` | LLM and notification settings |
-| `pod_exclusions` | Excluded pod patterns |
-| `namespace_exclusions` | Excluded namespaces |
-| `users` | Dashboard accounts |
+| `failed_pods` | Pod failure records with AI solutions |
+| `security_issues` | Security scan results and AI fixes |
+| `advice_findings` | AI Advice detector findings and lazy explanations |
+| `audit_logs` | Admin-only immutable audit trail (`JSONB` details) |
+| `llm_configs` | Multi-LLM provider configurations and custom instructions |
+| `admin_config` | Notification, SSO, and application settings |
+| `pod_exclusions` / `namespace_exclusions` | Suppressed pods, namespaces, and rules |
+| `users` / `teams` / `team_members` | Dashboard accounts, invitations, and namespace/tab RBAC |
 
 ## Data flows
 
@@ -260,7 +241,10 @@ rules:
 | Agent | DaemonSet (inherently HA) |
 | Scanner | Single replica (stateless) |
 
-For multi-replica backends, the bootstrap Secret keeps `session-secret` consistent across replicas — see [Authentication](/configuration/authentication/).
+For multi-replica backends (2.6.3+):
+- Real-time WebSocket broadcasts and LLM config reloads stay synchronized across all replicas via PostgreSQL `LISTEN/NOTIFY` (`kure_ws_events`, `kure_config_events`) with per-pod deduplication.
+- Background cleanup jobs use PostgreSQL advisory locks so only one replica executes each cycle.
+- The bootstrap Secret keeps `session-secret` consistent across replicas — see [Authentication](/configuration/authentication/).
 
 
 ## Container hardening

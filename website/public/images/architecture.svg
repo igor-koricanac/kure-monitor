@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680" width="1100" height="680" role="img" aria-label="Kure Monitor System Architecture">
+  <defs>
+    <style>
+      .font { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+      .title { font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .subtitle { font-size: 11px; font-weight: 500; fill: #475569; }
+      .badge { font-size: 10px; font-weight: 600; fill: #334155; }
+      .item { font-size: 11px; font-weight: 500; fill: #334155; }
+      .group-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; fill: #64748b; }
+      .edge-label { font-size: 10px; font-weight: 600; fill: #475569; }
+    </style>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.06"/>
+    </filter>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#059669"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#d97706"/>
+    </marker>
+  </defs>
+
+  <!-- Canvas background -->
+  <rect width="1100" height="680" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- EXTERNAL SERVICES ZONE (TOP) -->
+  <rect x="28" y="24" width="1044" height="122" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="44" y="45" class="font group-label">External Integrations &amp; AI Providers</text>
+
+  <!-- LLM Providers -->
+  <g filter="url(#shadow)">
+    <rect x="44" y="58" width="320" height="74" rx="10" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1.5"/>
+    <text x="60" y="81" class="font title">LLM Providers</text>
+    <text x="60" y="99" class="font subtitle">OpenAI · Anthropic · Groq · Gemini · Copilot · Ollama</text>
+    <text x="60" y="117" class="font badge" fill="#6d28d9">Multi-LLM · Optional HTTP Proxy · Reasoning Effort</text>
+  </g>
+
+  <!-- SSO / OIDC -->
+  <g filter="url(#shadow)">
+    <rect x="394" y="58" width="300" height="74" rx="10" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="410" y="81" class="font title">SSO / OIDC Identity Provider</text>
+    <text x="410" y="99" class="font subtitle">Keycloak · Okta · Azure AD · Google</text>
+    <text x="410" y="117" class="font badge" fill="#1d4ed8">OIDC Login · Group-to-Team RBAC Sync</text>
+  </g>
+
+  <!-- ChatOps -->
+  <g filter="url(#shadow)">
+    <rect x="724" y="58" width="332" height="74" rx="10" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+    <text x="740" y="81" class="font title">Notifications &amp; ChatOps</text>
+    <text x="740" y="99" class="font subtitle">Slack · Microsoft Teams · Webhooks</text>
+    <text x="740" y="117" class="font badge" fill="#b45309">Failure Alerts · Interactive Action Buttons</text>
+  </g>
+
+  <!-- KUBERNETES CLUSTER ZONE (MIDDLE + BOTTOM) -->
+  <rect x="28" y="176" width="1044" height="476" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="44" y="198" class="font group-label">Kubernetes Cluster (Namespace: kure-system)</text>
+
+  <!-- LEFT COLUMN: IN-CLUSTER COLLECTORS + K8S API -->
+  <!-- Kure Agent -->
+  <g filter="url(#shadow)">
+    <rect x="48" y="220" width="248" height="112" rx="10" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+    <text x="64" y="244" class="font title">Kure Agent</text>
+    <rect x="194" y="229" width="88" height="20" rx="10" fill="#d1fae5"/>
+    <text x="238" y="243" text-anchor="middle" class="font badge" fill="#047857">DaemonSet</text>
+    <text x="64" y="266" class="font item">• Node-scoped pod watch</text>
+    <text x="64" y="284" class="font item">• Logs, events &amp; manifests</text>
+    <text x="64" y="302" class="font item">• AI Advice detectors</text>
+    <text x="64" y="320" class="font subtitle">Auth: X-Service-Token</text>
+  </g>
+
+  <!-- Security Scanner -->
+  <g filter="url(#shadow)">
+    <rect x="48" y="356" width="248" height="104" rx="10" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+    <text x="64" y="380" class="font title">Security Scanner</text>
+    <rect x="194" y="365" width="88" height="20" rx="10" fill="#d1fae5"/>
+    <text x="238" y="379" text-anchor="middle" class="font badge" fill="#047857">Deployment</text>
+    <text x="64" y="402" class="font item">• Scheduled &amp; on-demand audits</text>
+    <text x="64" y="420" class="font item">• CIS / Pod Security checks</text>
+    <text x="64" y="438" class="font subtitle">Auth: X-Service-Token</text>
+  </g>
+
+  <!-- Kubernetes API Server -->
+  <g filter="url(#shadow)">
+    <rect x="48" y="514" width="248" height="110" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="64" y="540" class="font title">Kubernetes API Server</text>
+    <text x="64" y="562" class="font item">• Watch pods, events, logs</text>
+    <text x="64" y="580" class="font item">• Topology &amp; RBAC graph</text>
+    <text x="64" y="598" class="font item">• Mirror pod deploy / TTL</text>
+    <text x="64" y="614" class="font subtitle">No Secret read access by design</text>
+  </g>
+
+  <!-- CENTER: KURE BACKEND (HA) -->
+  <g filter="url(#shadow)">
+    <rect x="374" y="220" width="340" height="240" rx="12" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+    <text x="392" y="246" class="font title" style="font-size: 15px;">Kure Backend (FastAPI)</text>
+    <rect x="596" y="230" width="104" height="22" rx="11" fill="#dbeafe"/>
+    <text x="648" y="245" text-anchor="middle" class="font badge" fill="#1d4ed8">1–3 Replicas HA</text>
+
+    <!-- Backend internal modules -->
+    <rect x="392" y="264" width="146" height="54" rx="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1"/>
+    <text x="404" y="284" class="font title" style="font-size: 12px;">REST API &amp; RBAC</text>
+    <text x="404" y="302" class="font subtitle">Sessions · Teams · SSO</text>
+
+    <rect x="550" y="264" width="146" height="54" rx="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1"/>
+    <text x="562" y="284" class="font title" style="font-size: 12px;">WebSocket Hub</text>
+    <text x="562" y="302" class="font subtitle">Real-time UI &amp; Audit</text>
+
+    <rect x="392" y="330" width="146" height="54" rx="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1"/>
+    <text x="404" y="350" class="font title" style="font-size: 12px;">AI Solution Engine</text>
+    <text x="404" y="368" class="font subtitle">RCA · Fixes · Mirror</text>
+
+    <rect x="550" y="330" width="146" height="54" rx="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1"/>
+    <text x="562" y="350" class="font title" style="font-size: 12px;">Audit &amp; Metrics</text>
+    <text x="562" y="368" class="font subtitle">JSONB · /metrics</text>
+
+    <rect x="392" y="396" width="304" height="48" rx="8" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+    <text x="544" y="416" text-anchor="middle" class="font badge" fill="#1e40af">Multi-Replica HA Sync</text>
+    <text x="544" y="432" text-anchor="middle" class="font subtitle" fill="#1e3a8a">PostgreSQL LISTEN/NOTIFY + Advisory Locks</text>
+  </g>
+
+  <!-- BOTTOM CENTER: POSTGRESQL -->
+  <g filter="url(#shadow)">
+    <rect x="374" y="514" width="340" height="110" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+    <text x="392" y="540" class="font title">PostgreSQL Database</text>
+    <rect x="564" y="524" width="136" height="20" rx="10" fill="#e2e8f0"/>
+    <text x="632" y="538" text-anchor="middle" class="font badge">StatefulSet / Managed</text>
+    <text x="392" y="562" class="font item">• Pod failures, security &amp; advice findings</text>
+    <text x="392" y="580" class="font item">• Users, teams, SSO &amp; LLM configurations</text>
+    <text x="392" y="598" class="font item">• Audit logs (JSONB) &amp; LISTEN/NOTIFY bus</text>
+  </g>
+
+  <!-- RIGHT COLUMN: KURE FRONTEND + USERS -->
+  <g filter="url(#shadow)">
+    <rect x="790" y="256" width="260" height="168" rx="10" fill="#eef2ff" stroke="#818cf8" stroke-width="1.5"/>
+    <text x="808" y="282" class="font title">Kure Frontend</text>
+    <rect x="954" y="267" width="84" height="20" rx="10" fill="#e0e7ff"/>
+    <text x="996" y="281" text-anchor="middle" class="font badge" fill="#4338ca">React 18</text>
+    <text x="808" y="306" class="font item">• Live Pods &amp; Failures</text>
+    <text x="808" y="324" class="font item">• Security Scan &amp; AI Diffs</text>
+    <text x="808" y="342" class="font item">• Topology &amp; RBAC Diagram</text>
+    <text x="808" y="360" class="font item">• AI Advice &amp; Mirror Testing</text>
+    <text x="808" y="378" class="font item">• Admin Panel &amp; Audit Log</text>
+    <text x="808" y="404" class="font subtitle">1–3 Replicas · Nginx</text>
+  </g>
+
+  <!-- Browser / Users -->
+  <g filter="url(#shadow)">
+    <rect x="790" y="514" width="260" height="110" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="808" y="542" class="font title">Engineers &amp; Admins</text>
+    <text x="808" y="564" class="font item">• Browser Dashboard (HTTPS)</text>
+    <text x="808" y="582" class="font item">• Real-time WebSocket updates</text>
+    <text x="808" y="600" class="font item">• Grafana Plugin / Prometheus</text>
+  </g>
+
+  <!-- ARROWS / CONNECTIONS -->
+  <!-- Backend -> LLM Providers -->
+  <path d="M 440 220 L 440 160 L 204 160 L 204 132" fill="none" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+  <text x="212" y="154" class="font edge-label" fill="#6d28d9">HTTPS (Solutions, Fixes, Advice)</text>
+
+  <!-- Backend <-> SSO / OIDC -->
+  <path d="M 544 220 L 544 132" fill="none" stroke="#2563eb" stroke-width="1.8" marker-end="url(#arrow-blue)" marker-start="url(#arrow-blue)"/>
+  <text x="552" y="160" class="font edge-label" fill="#1d4ed8">OIDC / OAuth2</text>
+
+  <!-- Backend <-> ChatOps -->
+  <path d="M 648 220 L 648 160 L 890 160 L 890 132" fill="none" stroke="#d97706" stroke-width="1.8" marker-end="url(#arrow-amber)" marker-start="url(#arrow-amber)"/>
+  <text x="720" y="154" class="font edge-label" fill="#b45309">Webhooks &amp; Interactive Actions</text>
+
+  <!-- Agent -> Backend -->
+  <path d="M 296 276 L 374 276" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-emerald)"/>
+  <text x="335" y="268" text-anchor="middle" class="font edge-label" fill="#047857">REST</text>
+
+  <!-- Security Scanner -> Backend -->
+  <path d="M 296 408 L 374 408" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-emerald)"/>
+  <text x="335" y="400" text-anchor="middle" class="font edge-label" fill="#047857">REST</text>
+
+  <!-- Agent & Scanner -> K8s API -->
+  <path d="M 108 332 L 108 514" fill="none" stroke="#64748b" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrow-slate)"/>
+  <path d="M 172 460 L 172 514" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+  <text x="180" y="492" class="font edge-label">Watch / List</text>
+
+  <!-- Backend <-> K8s API -->
+  <path d="M 374 446 L 336 446 L 336 568 L 296 568" fill="none" stroke="#2563eb" stroke-width="1.6" marker-end="url(#arrow-blue)"/>
+  <text x="342" y="502" class="font edge-label" fill="#1d4ed8">Logs,</text>
+  <text x="342" y="514" class="font edge-label" fill="#1d4ed8">Mirror,</text>
+  <text x="342" y="526" class="font edge-label" fill="#1d4ed8">Graph</text>
+
+  <!-- Backend <-> PostgreSQL -->
+  <path d="M 544 460 L 544 514" fill="none" stroke="#334155" stroke-width="2" marker-end="url(#arrow-slate)" marker-start="url(#arrow-slate)"/>
+  <text x="554" y="492" class="font edge-label">TCP + LISTEN/NOTIFY</text>
+
+  <!-- Frontend <-> Backend -->
+  <path d="M 790 340 L 714 340" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" marker-start="url(#arrow-blue)"/>
+  <text x="752" y="330" text-anchor="middle" class="font edge-label" fill="#1d4ed8">HTTP / WS</text>
+
+  <!-- Users <-> Frontend -->
+  <path d="M 920 514 L 920 424" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow-slate)" marker-start="url(#arrow-slate)"/>
+  <text x="928" y="474" class="font edge-label">HTTPS / WSS</text>
+</svg>
