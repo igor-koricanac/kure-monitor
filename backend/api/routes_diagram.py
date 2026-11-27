@@ -99,6 +99,22 @@ def create_diagram_router(deps: RouterDeps) -> APIRouter:
             logger.error(f"Failed to build namespace diagram for {ns}: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
+    @router.get("/diagram/workloads/{ns}")
+    async def list_workload_kinds(ns: str, request: Request):
+        if not K8S_AVAILABLE:
+            raise HTTPException(
+                status_code=503, detail="Kubernetes client not available"
+            )
+        await _check_diagram_namespace_access(request, ns)
+        try:
+            kinds = await service.list_workload_kinds(ns)
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        except Exception as e:
+            logger.error(f"Failed to list workload kinds in {ns}: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        return {"kinds": kinds}
+
     @router.get("/diagram/workloads/{ns}/{kind}")
     async def list_workloads(ns: str, kind: str, request: Request):
         if not K8S_AVAILABLE:

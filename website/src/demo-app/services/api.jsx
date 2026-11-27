@@ -351,11 +351,20 @@ const NAMESPACE_DIAGRAMS = {
     nodes: [
       { id: 'ing-prod', kind: 'Ingress', name: 'prod-ingress', namespace: 'production', status: 'Active' },
       { id: 'svc-api', kind: 'Service', name: 'api-gateway-svc', namespace: 'production', status: 'ClusterIP' },
-      { id: 'dep-api', kind: 'Deployment', name: 'api-gateway', namespace: 'production', status: '1/1 Ready' },
-      { id: 'rs-api', kind: 'ReplicaSet', name: 'api-gateway-6b8f9c', namespace: 'production', status: '1/1' },
+      { id: 'dep-api', kind: 'Deployment', name: 'api-gateway', namespace: 'production', status: '2/2 Ready' },
+      { id: 'rs-api', kind: 'ReplicaSet', name: 'api-gateway-6b8f9c', namespace: 'production', status: '2/2' },
       { id: 'pod-api', kind: 'Pod', name: 'api-gateway-6b8f9c-abc12', namespace: 'production', status: 'Running' },
       { id: 'dep-inv', kind: 'Deployment', name: 'inventory-sync', namespace: 'production', status: '0/1 Ready' },
       { id: 'pod-inv', kind: 'Pod', name: 'inventory-sync-5f9b4c8d-x7qz9', namespace: 'production', status: 'CrashLoopBackOff' },
+      { id: 'sts-redis', kind: 'StatefulSet', name: 'redis-cache', namespace: 'production', status: '1/1 Ready' },
+      { id: 'pod-redis', kind: 'Pod', name: 'redis-cache-0', namespace: 'production', status: 'Running' },
+      { id: 'pvc-redis', kind: 'PersistentVolumeClaim', name: 'redis-data-0', namespace: 'production', status: 'Bound' },
+      { id: 'ds-log', kind: 'DaemonSet', name: 'fluent-bit-collector', namespace: 'production', status: '3/3 Ready' },
+      { id: 'pod-log', kind: 'Pod', name: 'fluent-bit-collector-k8n2p', namespace: 'production', status: 'Running' },
+      { id: 'job-mig', kind: 'Job', name: 'schema-migration-v42', namespace: 'production', status: 'Complete' },
+      { id: 'pod-mig', kind: 'Pod', name: 'schema-migration-v42-9x4lm', namespace: 'production', status: 'Succeeded' },
+      { id: 'cj-clean', kind: 'CronJob', name: 'nightly-cache-warmup', namespace: 'production', status: 'Scheduled' },
+      { id: 'pod-clean', kind: 'Pod', name: 'nightly-cache-warmup-28910-q2w1', namespace: 'production', status: 'Succeeded' },
       { id: 'cm-prod', kind: 'ConfigMap', name: 'prod-config', namespace: 'production', status: 'Active' },
       { id: 'sec-prod', kind: 'Secret', name: 'api-auth-secret', namespace: 'production', status: 'Derived', metadata: { derived: true } },
     ],
@@ -367,6 +376,11 @@ const NAMESPACE_DIAGRAMS = {
       { source: 'pod-api', target: 'cm-prod', type: 'mounts' },
       { source: 'dep-inv', target: 'pod-inv', type: 'owns' },
       { source: 'pod-inv', target: 'sec-prod', type: 'mounts' },
+      { source: 'sts-redis', target: 'pod-redis', type: 'owns' },
+      { source: 'pod-redis', target: 'pvc-redis', type: 'mounts' },
+      { source: 'ds-log', target: 'pod-log', type: 'owns' },
+      { source: 'job-mig', target: 'pod-mig', type: 'owns' },
+      { source: 'cj-clean', target: 'pod-clean', type: 'owns' },
     ],
     groups: [],
   },
@@ -378,6 +392,15 @@ const NAMESPACE_DIAGRAMS = {
       { id: 'pod-chk', kind: 'Pod', name: 'checkout-api-8d9e7f-p4r2s', namespace: 'payments', status: 'Running' },
       { id: 'dep-wh', kind: 'Deployment', name: 'stripe-webhook-worker', namespace: 'payments', status: '0/1 Ready' },
       { id: 'pod-wh', kind: 'Pod', name: 'stripe-webhook-worker-7c4d9b-m9k2p', namespace: 'payments', status: 'OOMKilled' },
+      { id: 'sts-ledger', kind: 'StatefulSet', name: 'ledger-event-store', namespace: 'payments', status: '1/1 Ready' },
+      { id: 'pod-ledger', kind: 'Pod', name: 'ledger-event-store-0', namespace: 'payments', status: 'Running' },
+      { id: 'pvc-ledger', kind: 'PersistentVolumeClaim', name: 'ledger-wal-0', namespace: 'payments', status: 'Bound' },
+      { id: 'ds-pci', kind: 'DaemonSet', name: 'pci-audit-agent', namespace: 'payments', status: '3/3 Ready' },
+      { id: 'pod-pci', kind: 'Pod', name: 'pci-audit-agent-v2k9x', namespace: 'payments', status: 'Running' },
+      { id: 'job-recon', kind: 'Job', name: 'settlement-reconcile', namespace: 'payments', status: 'Complete' },
+      { id: 'pod-recon', kind: 'Pod', name: 'settlement-reconcile-4n8st', namespace: 'payments', status: 'Succeeded' },
+      { id: 'cj-invoice', kind: 'CronJob', name: 'hourly-invoice-sync', namespace: 'payments', status: 'Scheduled' },
+      { id: 'pod-invoice', kind: 'Pod', name: 'hourly-invoice-sync-28910-j7m3', namespace: 'payments', status: 'Succeeded' },
       { id: 'np-pay', kind: 'NetworkPolicy', name: 'payments-egress-lock', namespace: 'payments', status: 'Active' },
       { id: 'sec-stripe', kind: 'Secret', name: 'stripe-signing-key', namespace: 'payments', status: 'Derived', metadata: { derived: true } },
     ],
@@ -388,6 +411,11 @@ const NAMESPACE_DIAGRAMS = {
       { source: 'dep-wh', target: 'pod-wh', type: 'owns' },
       { source: 'pod-wh', target: 'sec-stripe', type: 'mounts' },
       { source: 'np-pay', target: 'pod-chk', type: 'policy' },
+      { source: 'sts-ledger', target: 'pod-ledger', type: 'owns' },
+      { source: 'pod-ledger', target: 'pvc-ledger', type: 'mounts' },
+      { source: 'ds-pci', target: 'pod-pci', type: 'owns' },
+      { source: 'job-recon', target: 'pod-recon', type: 'owns' },
+      { source: 'cj-invoice', target: 'pod-invoice', type: 'owns' },
     ],
     groups: [],
   },
@@ -397,11 +425,114 @@ const NAMESPACE_DIAGRAMS = {
       { id: 'sts-pg', kind: 'StatefulSet', name: 'postgres-primary', namespace: 'database', status: '1/1 Ready' },
       { id: 'pod-pg', kind: 'Pod', name: 'postgres-primary-0', namespace: 'database', status: 'Running' },
       { id: 'pvc-pg', kind: 'PersistentVolumeClaim', name: 'pg-data-0', namespace: 'database', status: 'Bound' },
+      { id: 'dep-pool', kind: 'Deployment', name: 'pgbouncer-pooler', namespace: 'database', status: '2/2 Ready' },
+      { id: 'pod-pool', kind: 'Pod', name: 'pgbouncer-pooler-6f8d9c-w3r5t', namespace: 'database', status: 'Running' },
+      { id: 'ds-disk', kind: 'DaemonSet', name: 'nvme-metrics-exporter', namespace: 'database', status: '3/3 Ready' },
+      { id: 'pod-disk', kind: 'Pod', name: 'nvme-metrics-exporter-b9l4z', namespace: 'database', status: 'Running' },
+      { id: 'job-vacuum', kind: 'Job', name: 'pg-reindex-maintenance', namespace: 'database', status: 'Complete' },
+      { id: 'pod-vacuum', kind: 'Pod', name: 'pg-reindex-maintenance-8c2vx', namespace: 'database', status: 'Succeeded' },
+      { id: 'cj-backup', kind: 'CronJob', name: 'nightly-pg-backup', namespace: 'database', status: 'Scheduled' },
+      { id: 'pod-backup', kind: 'Pod', name: 'nightly-pg-backup-28910-f5k1', namespace: 'database', status: 'Succeeded' },
+      { id: 'sec-pg', kind: 'Secret', name: 'postgres-credentials', namespace: 'database', status: 'Derived', metadata: { derived: true } },
     ],
     edges: [
       { source: 'svc-pg', target: 'pod-pg', type: 'selects' },
       { source: 'sts-pg', target: 'pod-pg', type: 'owns' },
       { source: 'pod-pg', target: 'pvc-pg', type: 'mounts' },
+      { source: 'pod-pg', target: 'sec-pg', type: 'mounts' },
+      { source: 'dep-pool', target: 'pod-pool', type: 'owns' },
+      { source: 'pod-pool', target: 'svc-pg', type: 'routes' },
+      { source: 'ds-disk', target: 'pod-disk', type: 'owns' },
+      { source: 'job-vacuum', target: 'pod-vacuum', type: 'owns' },
+      { source: 'cj-backup', target: 'pod-backup', type: 'owns' },
+    ],
+    groups: [],
+  },
+};
+
+const ROLE_DIAGRAMS = {
+  'production/app-deployer': {
+    nodes: [
+      { id: 'role-prod-dep', kind: 'Role', name: 'app-deployer', namespace: 'production', status: 'Active' },
+      { id: 'rb-prod-dep', kind: 'RoleBinding', name: 'app-deployer-binding', namespace: 'production', status: 'Active' },
+      { id: 'sa-prod-ci', kind: 'Subject:ServiceAccount', name: 'ci-runner', namespace: 'production', status: 'Subject' },
+      { id: 'grp-prod-dev', kind: 'Subject:Group', name: 'team-platform', namespace: 'production', status: 'Subject' },
+      { id: 'perm-prod-dep', kind: 'Permission', name: 'apps/deployments', namespace: 'production', status: 'get, list, watch, update, patch' },
+      { id: 'perm-prod-pod', kind: 'Permission', name: 'core/pods', namespace: 'production', status: 'get, list, watch' },
+    ],
+    edges: [
+      { source: 'rb-prod-dep', target: 'role-prod-dep', type: 'binds' },
+      { source: 'rb-prod-dep', target: 'sa-prod-ci', type: 'grants' },
+      { source: 'rb-prod-dep', target: 'grp-prod-dev', type: 'grants' },
+      { source: 'role-prod-dep', target: 'perm-prod-dep', type: 'allows' },
+      { source: 'role-prod-dep', target: 'perm-prod-pod', type: 'allows' },
+    ],
+    groups: [],
+  },
+  'payments/payments-operator': {
+    nodes: [
+      { id: 'role-pay-op', kind: 'Role', name: 'payments-operator', namespace: 'payments', status: 'Active' },
+      { id: 'rb-pay-op', kind: 'RoleBinding', name: 'payments-operator-binding', namespace: 'payments', status: 'Active' },
+      { id: 'sa-pay-op', kind: 'Subject:ServiceAccount', name: 'payments-controller', namespace: 'payments', status: 'Subject' },
+      { id: 'perm-pay-pod', kind: 'Permission', name: 'core/pods, services', namespace: 'payments', status: 'get, list, watch, create' },
+      { id: 'perm-pay-cm', kind: 'Permission', name: 'core/configmaps', namespace: 'payments', status: 'get, list, update' },
+    ],
+    edges: [
+      { source: 'rb-pay-op', target: 'role-pay-op', type: 'binds' },
+      { source: 'rb-pay-op', target: 'sa-pay-op', type: 'grants' },
+      { source: 'role-pay-op', target: 'perm-pay-pod', type: 'allows' },
+      { source: 'role-pay-op', target: 'perm-pay-cm', type: 'allows' },
+    ],
+    groups: [],
+  },
+  'database/db-backup-runner': {
+    nodes: [
+      { id: 'role-db-bak', kind: 'Role', name: 'db-backup-runner', namespace: 'database', status: 'Active' },
+      { id: 'rb-db-bak', kind: 'RoleBinding', name: 'db-backup-binding', namespace: 'database', status: 'Active' },
+      { id: 'sa-db-bak', kind: 'Subject:ServiceAccount', name: 'pg-backup-sa', namespace: 'database', status: 'Subject' },
+      { id: 'perm-db-pvc', kind: 'Permission', name: 'core/persistentvolumeclaims', namespace: 'database', status: 'get, list' },
+      { id: 'perm-db-job', kind: 'Permission', name: 'batch/jobs', namespace: 'database', status: 'get, list, create, delete' },
+    ],
+    edges: [
+      { source: 'rb-db-bak', target: 'role-db-bak', type: 'binds' },
+      { source: 'rb-db-bak', target: 'sa-db-bak', type: 'grants' },
+      { source: 'role-db-bak', target: 'perm-db-pvc', type: 'allows' },
+      { source: 'role-db-bak', target: 'perm-db-job', type: 'allows' },
+    ],
+    groups: [],
+  },
+};
+
+const CLUSTER_ROLE_DIAGRAMS = {
+  'kure-monitor-backend': {
+    nodes: [
+      { id: 'cr-kure', kind: 'ClusterRole', name: 'kure-monitor-backend', namespace: '', status: 'Active' },
+      { id: 'crb-kure', kind: 'ClusterRoleBinding', name: 'kure-monitor-backend-binding', namespace: '', status: 'Active' },
+      { id: 'sa-kure', kind: 'Subject:ServiceAccount', name: 'kure-system/kure-backend', namespace: 'kure-system', status: 'Subject' },
+      { id: 'perm-kure-pods', kind: 'Permission', name: 'core/pods, pods/log', namespace: '', status: 'get, list, create, delete' },
+      { id: 'perm-kure-apps', kind: 'Permission', name: 'apps/deployments, statefulsets', namespace: '', status: 'get, list' },
+      { id: 'perm-kure-rbac', kind: 'Permission', name: 'rbac.authorization.k8s.io/roles', namespace: '', status: 'get, list' },
+    ],
+    edges: [
+      { source: 'crb-kure', target: 'cr-kure', type: 'binds' },
+      { source: 'crb-kure', target: 'sa-kure', type: 'grants' },
+      { source: 'cr-kure', target: 'perm-kure-pods', type: 'allows' },
+      { source: 'cr-kure', target: 'perm-kure-apps', type: 'allows' },
+      { source: 'cr-kure', target: 'perm-kure-rbac', type: 'allows' },
+    ],
+    groups: [],
+  },
+  'cluster-readonly-auditor': {
+    nodes: [
+      { id: 'cr-audit', kind: 'ClusterRole', name: 'cluster-readonly-auditor', namespace: '', status: 'Active' },
+      { id: 'crb-audit', kind: 'ClusterRoleBinding', name: 'auditors-readonly-binding', namespace: '', status: 'Active' },
+      { id: 'grp-audit', kind: 'Subject:Group', name: 'security-auditors', namespace: '', status: 'Subject' },
+      { id: 'perm-audit-all', kind: 'Permission', name: 'core/pods, namespaces, events', namespace: '', status: 'get, list, watch' },
+    ],
+    edges: [
+      { source: 'crb-audit', target: 'cr-audit', type: 'binds' },
+      { source: 'crb-audit', target: 'grp-audit', type: 'grants' },
+      { source: 'cr-audit', target: 'perm-audit-all', type: 'allows' },
     ],
     groups: [],
   },
@@ -619,9 +750,61 @@ Analysis of the captured logs and Kubernetes events for \`${ns}/${name}\` (\`${r
       err.status = 404;
       throw err;
     }
-    return d;
+    // Extract connected component around the selected workload
+    const visited = new Set([match.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const e of d.edges) {
+        if (visited.has(e.source) && !visited.has(e.target)) {
+          visited.add(e.target);
+          changed = true;
+        } else if (visited.has(e.target) && !visited.has(e.source)) {
+          visited.add(e.source);
+          changed = true;
+        }
+      }
+    }
+    return {
+      nodes: d.nodes.filter((n) => visited.has(n.id)),
+      edges: d.edges.filter((e) => visited.has(e.source) && visited.has(e.target)),
+      groups: [],
+    };
   },
-  getDiagramRoles: async () => ({ roles: [], cluster_roles: [] }),
+  getDiagramRoles: async () => {
+    const u = getActiveUser();
+    const allRoles = [
+      { namespace: 'production', name: 'app-deployer' },
+      { namespace: 'payments', name: 'payments-operator' },
+      { namespace: 'database', name: 'db-backup-runner' },
+    ];
+    const roles =
+      u.role === 'admin' || u.permissions?.all_namespaces
+        ? allRoles
+        : allRoles.filter((r) => (u.permissions?.namespaces || []).includes(r.namespace));
+    const cluster_roles = [
+      { name: 'kure-monitor-backend' },
+      { name: 'cluster-readonly-auditor' },
+    ];
+    return { roles, cluster_roles };
+  },
+  getDiagramRole: async (ns, name) => {
+    const key = `${ns}/${name}`;
+    if (!ROLE_DIAGRAMS[key]) {
+      const err = new Error('HTTP error! status: 404');
+      err.status = 404;
+      throw err;
+    }
+    return ROLE_DIAGRAMS[key];
+  },
+  getDiagramClusterRole: async (name) => {
+    if (!CLUSTER_ROLE_DIAGRAMS[name]) {
+      const err = new Error('HTTP error! status: 404');
+      err.status = 404;
+      throw err;
+    }
+    return CLUSTER_ROLE_DIAGRAMS[name];
+  },
   getResourceManifest: async (ns, kind, name) => ({
     manifest: `apiVersion: v1\nkind: ${kind}\nmetadata:\n  name: ${name}\n  namespace: ${ns}`,
   }),

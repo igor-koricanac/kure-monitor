@@ -3,13 +3,13 @@ import { AlertTriangle, Network, RefreshCw } from 'lucide-react';
 import TopologyGraph from './TopologyGraph';
 import { api } from '../../services/api';
 
-const WORKLOAD_KINDS = ['Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob'];
-
 const DiagramTab = ({ isDark = false }) => {
   const [mode, setMode] = useState('namespace');
   const [namespaces, setNamespaces] = useState([]);
   const [namespace, setNamespace] = useState('');
-  const [kind, setKind] = useState('Deployment');
+  const [kind, setKind] = useState('');
+  const [availableKinds, setAvailableKinds] = useState([]);
+  const [kindsLoading, setKindsLoading] = useState(false);
   const [workloadName, setWorkloadName] = useState('');
   const [workloadNames, setWorkloadNames] = useState([]);
   const [workloadsLoading, setWorkloadsLoading] = useState(false);
@@ -28,11 +28,10 @@ const DiagramTab = ({ isDark = false }) => {
 
   useEffect(() => {
     let cancelled = false;
-    const filterKind = mode === 'workload' ? kind : undefined;
     (async () => {
       try {
         setNsLoading(true);
-        const res = await api.getDiagramNamespaces(filterKind);
+        const res = await api.getDiagramNamespaces();
         if (cancelled) return;
         const list = res?.namespaces || [];
         setNamespaces(list);
@@ -46,18 +45,51 @@ const DiagramTab = ({ isDark = false }) => {
     return () => {
       cancelled = true;
     };
-  }, [mode, kind]);
+  }, [mode]);
+
+  // Load available workload kinds for the selected namespace when in workload mode.
+  useEffect(() => {
+    if (mode !== 'workload' || !namespace) {
+      setAvailableKinds([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setKindsLoading(true);
+        setError('');
+        const res = await api.getDiagramWorkloadKinds(namespace);
+        if (cancelled) return;
+        const list = res?.kinds || [];
+        setAvailableKinds(list);
+        setKind((prev) => (list.includes(prev) ? prev : list[0] || ''));
+      } catch (err) {
+        if (!cancelled) {
+          setAvailableKinds([]);
+          setKind('');
+          setError(`Failed to load workload kinds: ${err.message || 'unknown error'}`);
+        }
+      } finally {
+        if (!cancelled) setKindsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, namespace]);
 
   // Load workload names when in workload mode and ns/kind change.
   useEffect(() => {
-    if (mode !== 'workload' || !namespace) {
+    if (mode !== 'workload' || !namespace || !kind) {
       setWorkloadNames([]);
+      setWorkloadName('');
       return;
     }
     let cancelled = false;
     (async () => {
       try {
         setWorkloadsLoading(true);
+        setError('');
         const res = await api.getDiagramWorkloads(namespace, kind);
         if (cancelled) return;
         const list = res?.workloads || [];
@@ -401,9 +433,15 @@ const DiagramTab = ({ isDark = false }) => {
                   id="diagram-kind"
                   value={kind}
                   onChange={(e) => setKind(e.target.value)}
+                  disabled={kindsLoading || availableKinds.length === 0}
                   className={selectClass}
                 >
-                  {WORKLOAD_KINDS.map((k) => (
+                  {availableKinds.length === 0 && (
+                    <option value="">
+                      {kindsLoading ? 'Loading…' : 'No workloads in namespace'}
+                    </option>
+                  )}
+                  {availableKinds.map((k) => (
                     <option key={k} value={k}>
                       {k}
                     </option>

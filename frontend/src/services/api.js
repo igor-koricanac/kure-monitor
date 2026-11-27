@@ -870,6 +870,13 @@ export const api = {
     return response.json();
   },
 
+  getDiagramWorkloadKinds: async (namespace) => {
+    const url = `${API_BASE}/api/diagram/workloads/${encodeURIComponent(namespace)}`;
+    const response = await authFetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
   getDiagramWorkloads: async (namespace, kind) => {
     const url = `${API_BASE}/api/diagram/workloads/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}`;
     const response = await authFetch(url);

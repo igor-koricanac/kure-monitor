@@ -428,6 +428,26 @@ class TopologyService:
 
         return sorted(_meta_name(w) for w in _items(result) if _meta_name(w))
 
+    async def list_workload_kinds(self, namespace: str) -> List[str]:
+        """List workload kinds that have at least one resource in the namespace."""
+        self._init_k8s()
+
+        checks = [
+            ("Deployment", self._apps.list_namespaced_deployment),
+            ("StatefulSet", self._apps.list_namespaced_stateful_set),
+            ("DaemonSet", self._apps.list_namespaced_daemon_set),
+            ("Job", self._batch.list_namespaced_job),
+            ("CronJob", self._batch.list_namespaced_cron_job),
+        ]
+        results = await asyncio.gather(
+            *(self._safe(fn, namespace) for _, fn in checks)
+        )
+        return [
+            kind
+            for (kind, _), res in zip(checks, results)
+            if len(_items(res)) > 0
+        ]
+
     async def get_namespace_diagram(self, namespace: str) -> DiagramResponse:
         cache_key = ("namespace", namespace, None)
         cached = self._cache.get(cache_key)
