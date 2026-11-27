@@ -1,109 +1,50 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api } from '../services/api';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { api, DEMO_USERS, setActiveDemoUser } from '../services/api';
 
 export const AuthContext = createContext(null);
 
-/**
- * AuthProvider manages the currently-logged-in user.
- *
- * Auth is cookie-based: the backend sets an HttpOnly `kure_session` cookie.
- * JS cannot read the cookie — we learn about the user by calling
- * `GET /api/auth/me`. A 401 means "not logged in".
- *
- * Additionally, on first boot we check `GET /api/auth/setup-required` so the
- * app can route to the first-run setup flow.
- */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [setupRequired, setSetupRequired] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState(DEMO_USERS.admin);
+
+  const switchDemoUser = useCallback((username) => {
+    const next = DEMO_USERS[username] || DEMO_USERS.admin;
+    setActiveDemoUser(next.username);
+    setUser(next);
+  }, []);
 
   const refreshAuth = useCallback(async () => {
-    try {
-      const setup = await api.getAuthSetupRequired();
-      if (setup?.setup_required) {
-        setSetupRequired(true);
-        setUser(null);
-        return { setupRequired: true, user: null };
-      }
-      setSetupRequired(false);
-    } catch (err) {
-      // Setup endpoint failure: fall through; let /me decide.
-      setSetupRequired(false);
-    }
-
-    try {
-      const me = await api.getAuthMe();
-      const u = me?.user ?? me;
-      setUser(u);
-      return { setupRequired: false, user: u };
-    } catch (err) {
-      setUser(null);
-      return { setupRequired: false, user: null };
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await refreshAuth();
-      if (!cancelled) {
-        setAuthChecked(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshAuth]);
-
-  const login = useCallback(async ({ username, password }) => {
-    await api.login({ username, password });
     const me = await api.getAuthMe();
     const u = me?.user ?? me;
     setUser(u);
-    return u;
+    return { setupRequired: false, user: u };
   }, []);
 
-  const setup = useCallback(async ({ username, password, email }) => {
-    await api.setupAdmin({ username, password, email });
-    const me = await api.getAuthMe();
-    const u = me?.user ?? me;
-    setUser(u);
-    setSetupRequired(false);
-    return u;
-  }, []);
-
-  const acceptInvitation = useCallback(async ({ token, username, password, email }) => {
-    await api.acceptInvitation({ token, username, password, email });
-    const me = await api.getAuthMe();
-    const u = me?.user ?? me;
-    setUser(u);
-    return u;
+  const login = useCallback(async ({ username }) => {
+    const next = DEMO_USERS[username] || DEMO_USERS.admin;
+    setActiveDemoUser(next.username);
+    setUser(next);
+    return next;
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await api.logout();
-    } catch {
-      // ignore - we're logging out locally anyway
-    }
-    setUser(null);
+    // In interactive demo, keep user signed in or reset to admin
+    setActiveDemoUser('admin');
+    setUser(DEMO_USERS.admin);
   }, []);
-
-  const isAuthenticated = !!user;
-  const userRole = user?.role || null;
 
   const value = {
     user,
-    userRole,
-    isAuthenticated,
-    authChecked,
-    setupRequired,
+    userRole: user?.role || 'admin',
+    isAuthenticated: true,
+    authChecked: true,
+    setupRequired: false,
     refreshAuth,
     login,
-    setup,
-    acceptInvitation,
+    setup: async () => DEMO_USERS.admin,
+    acceptInvitation: async () => DEMO_USERS.admin,
     logout,
+    switchDemoUser,
+    demoUsers: Object.values(DEMO_USERS),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -115,13 +56,13 @@ export function useAuth() {
   return ctx;
 }
 
-/**
- * Convenience hook for components that want to know if the current user
- * is allowed to perform mutations. Only `admin` and `member` roles can write.
- */
 export function useCanWrite() {
-  const { userRole } = useAuth();
-  return userRole === 'admin' || userRole === 'member';
+  const { user, userRole } = useAuth();
+  if (userRole === 'admin') return true;
+  if (user?.permissions?.access_level) {
+    return user.permissions.access_level === 'write';
+  }
+  return userRole === 'member';
 }
 
 export function useIsAdmin() {

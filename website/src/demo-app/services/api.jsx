@@ -1,510 +1,744 @@
-export const api = {
-  getAuthMe: async () => ({ username: 'demo', role: 'admin' }),
-  getConfig: async () => ({ pod_monitoring: true, security_scan: true, diagram: true, ai_advice: true, ai_enabled: true }),
-  
-  // Pods
-  getFailedPods: async () => ([
-    {
-      id: 1,
-      pod_name: 'inventory-sync-deployment-5f9b4c8d-x7qz9',
-      namespace: 'production',
-      node_name: 'kure-monitor-worker2',
-      phase: 'Running',
-      failure_reason: 'CrashLoopBackOff',
-      status: 'investigating',
-      timestamp: new Date().toISOString(),
-      solution: `The container \`inventory-sync\` is crashing on startup with an HTTP 401 Unauthorized error when attempting to connect to the upstream inventory service at \`http://inventory-service.default.svc\`.
+// Interactive Demo Mock API with Multi-Tenant Team RBAC & Namespace Isolation
 
-**Root Cause:** The pod is missing the \`API_TOKEN\` environment variable required for authenticating against the upstream API. Without a valid token, the service receives a 401 response and terminates.
-
-**Recommended Fix:** Add the \`API_TOKEN\` environment variable to the container spec, referencing a Kubernetes Secret that holds the authentication token. Create the secret with:
-
-\`\`\`bash
-kubectl create secret generic api-auth-secret --from-literal=token=<your-token> -n production
-\`\`\`
-
-Then update the Deployment manifest to inject the secret as an environment variable into the container.`,
-      manifest: `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: inventory-sync
-  namespace: production
-  labels:
-    app: inventory-sync
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: inventory-sync
-  template:
-    metadata:
-      labels:
-        app: inventory-sync
-    spec:
-      containers:
-      - name: inventory-sync
-        image: myregistry.io/inventory-sync:v2.1.0
-        ports:
-        - containerPort: 8080
-        env:
-        - name: UPSTREAM_API_URL
-          value: "http://inventory-service.default.svc"
-        - name: API_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: api-auth-secret
-              key: token
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 250m
-            memory: 256Mi
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 15
-      restartPolicy: Always`,
-      container_statuses: [{ name: 'inventory-sync', state: 'waiting', message: 'back-off 5m0s restarting failed container=inventory-sync' }],
-      events: [
-        { type: "Normal", reason: "Pulling", message: "Pulling image \"myregistry.io/inventory-sync:v2.1.0\"", timestamp: new Date(Date.now() - 3600000).toISOString() },
-        { type: "Normal", reason: "Pulled", message: "Successfully pulled image \"myregistry.io/inventory-sync:v2.1.0\"", timestamp: new Date(Date.now() - 3580000).toISOString() },
-        { type: "Warning", reason: "BackOff", message: "Back-off restarting failed container inventory-sync", timestamp: new Date(Date.now() - 3500000).toISOString() }
-      ],
-      logs: `[INFO] Starting inventory sync service v2.1.0...
-[INFO] Loading configuration from environment...
-[INFO] Attempting to connect to upstream API at http://inventory-service.default.svc...
-[ERROR] Request failed! HTTP Status 401 Unauthorized
-[ERROR] The authentication token provided is either missing or invalid.
-[ERROR] Sync aborted. Process terminating.`
-    }
-  ]),
-  updatePodStatus: async (id, status) => ({ id, status }),
-  retrySolution: async (podId) => {
-    return {
-      id: podId,
-      solution: 'This is a retried solution. Ensure your configurations are correct.',
-      timestamp: new Date().toISOString()
-    };
+export const DEMO_USERS = {
+  admin: {
+    id: 1,
+    username: 'admin',
+    email: 'admin@kuremonitor.com',
+    role: 'admin',
+    demoBadge: 'Admin · All NS',
+    demoDescription: 'Full cluster admin access (all namespaces, Admin Panel, Audit Log)',
+    teams: [],
+    permissions: {
+      all_namespaces: true,
+      namespaces: [],
+      tabs: ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice'],
+      access_level: 'write',
+    },
   },
-
-  // Mirror Pods
-  _mirrorPollCount: 0,
-  previewMirrorPod: async (podId) => ({
-    fixed_manifest: `apiVersion: v1
-kind: Pod
-metadata:
-  name: mirror-test-inventory-sync
-  namespace: production
-  labels:
-    app: inventory-sync
-    kure-mirror: "true"
-spec:
-  containers:
-  - name: inventory-sync
-    image: myregistry.io/inventory-sync:v2.1.0
-    ports:
-    - containerPort: 8080
-    env:
-    - name: UPSTREAM_API_URL
-      value: "http://inventory-service.default.svc"
-    - name: API_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: api-auth-secret
-          key: token
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
-  restartPolicy: Never`,
-    explanation: 'Added the missing API_TOKEN environment variable from the api-auth-secret Secret. The mirror pod uses restartPolicy: Never so it terminates cleanly after the test.'
-  }),
-  deployMirrorPod: async (podId, ttl, manifest) => {
-    api._mirrorPollCount = 0;
-    return {
-      mirror_id: `mirror-${podId}`,
-      mirror_pod_name: `mirror-test-inventory-sync`,
-      namespace: 'production',
-      phase: 'Pending',
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      ttl_seconds: ttl || 180,
-      events: [
-        { type: 'Normal', reason: 'Scheduled', message: 'Successfully assigned production/mirror-test-inventory-sync to kure-monitor-worker2' }
-      ]
-    };
+  user_1: {
+    id: 2,
+    username: 'user_1',
+    email: 'user1@kuremonitor.com',
+    role: 'member',
+    has_team: true,
+    all_namespaces: false,
+    effective_namespaces: ['production'],
+    effective_tabs: ['pod_monitoring', 'security_scanner', 'ai_advice'],
+    effective_access_level: 'write',
+    demoBadge: 'team_1 · production',
+    demoDescription: 'Member of team_1 — write access to production (no Diagram tab)',
+    teams: [{ id: 1, name: 'team_1' }],
+    permissions: {
+      all_namespaces: false,
+      namespaces: ['production'],
+      tabs: ['pod_monitoring', 'security_scanner', 'ai_advice'],
+      access_level: 'write',
+    },
   },
-  getMirrorStatus: async (mirrorId) => {
-    api._mirrorPollCount = (api._mirrorPollCount || 0) + 1;
-    if (api._mirrorPollCount <= 1) {
-      return {
-        mirror_id: mirrorId,
-        mirror_pod_name: 'mirror-test-inventory-sync',
-        namespace: 'production',
-        phase: 'Pending',
-        events: [
-          { type: 'Normal', reason: 'Scheduled', message: 'Successfully assigned production/mirror-test-inventory-sync to kure-monitor-worker2' },
-          { type: 'Normal', reason: 'Pulling', message: 'Pulling image "myregistry.io/inventory-sync:v2.1.0"' }
-        ]
-      };
-    }
-    return {
-      mirror_id: mirrorId,
-      mirror_pod_name: 'mirror-test-inventory-sync',
-      namespace: 'production',
-      phase: 'Running',
-      events: [
-        { type: 'Normal', reason: 'Scheduled', message: 'Successfully assigned production/mirror-test-inventory-sync to kure-monitor-worker2' },
-        { type: 'Normal', reason: 'Pulling', message: 'Pulling image "myregistry.io/inventory-sync:v2.1.0"' },
-        { type: 'Normal', reason: 'Pulled', message: 'Successfully pulled image "myregistry.io/inventory-sync:v2.1.0"' },
-        { type: 'Normal', reason: 'Created', message: 'Created container inventory-sync' },
-        { type: 'Normal', reason: 'Started', message: 'Started container inventory-sync' }
-      ]
-    };
+  user_2: {
+    id: 3,
+    username: 'user_2',
+    email: 'user2@kuremonitor.com',
+    role: 'member',
+    has_team: true,
+    all_namespaces: false,
+    effective_namespaces: ['payments'],
+    effective_tabs: ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice'],
+    effective_access_level: 'read',
+    demoBadge: 'team_2 · payments',
+    demoDescription: 'Member of team_2 — read access restricted to the payments namespace',
+    teams: [{ id: 2, name: 'team_2' }],
+    permissions: {
+      all_namespaces: false,
+      namespaces: ['payments'],
+      tabs: ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice'],
+      access_level: 'read',
+    },
   },
-  deleteMirrorPod: async (mirrorId) => ({ success: true }),
+};
 
-  getPodLogs: async (namespace, podName) => {
-    return {
-      logs: `2026-08-17T10:05:10Z INFO [payment-service] Starting service...
-2026-08-17T10:05:11Z INFO [payment-service] Connecting to database at db.internal:5432
-2026-08-17T10:05:12Z FATAL [payment-service] Cannot read property "password" of undefined
-2026-08-17T10:05:12Z INFO [payment-service] Exiting...`
-    };
-  },
-  getStreamingLogsUrl: () => null, // Just ignore streaming for demo
+let activeUsername = 'admin';
 
-  // Security
-  getSecurityFindings: async () => ([
-    {
-      id: 1,
-      resource_kind: 'Deployment',
-      resource_name: 'payment-service',
-      namespace: 'production',
-      severity: 'critical',
-      rule_id: 'KSV013',
-      title: 'Container is privileged',
-      description: 'Container is running as privileged which can compromise the host.',
-      timestamp: new Date().toISOString()
-    }
-  ]),
-  getSecurityFindingManifest: async () => ({
-    manifest: `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: payment-service
-  template:
-    metadata:
-      labels:
-        app: payment-service
-    spec:
-      containers:
-      - name: payment-service
-        image: myregistry.io/payment-service:v1.2.3
-        ports:
-        - containerPort: 8080
-        securityContext:
-          privileged: true
-        resources:
-          requests:
-            cpu: 200m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi`,
-    solution: `The container is running in privileged mode, which grants it full access to the host's devices and breaks container isolation. This is a critical security risk. Disable privileged mode and add explicit security hardening.`
-  }),
-  generateSecurityFix: async () => ({
-    diff: [
-      { type: 'context', content: 'apiVersion: apps/v1' },
-      { type: 'context', content: 'kind: Deployment' },
-      { type: 'context', content: 'metadata:' },
-      { type: 'context', content: '  name: payment-service' },
-      { type: 'context', content: '  namespace: production' },
-      { type: 'context', content: '  labels:' },
-      { type: 'context', content: '    app: payment-service' },
-      { type: 'context', content: 'spec:' },
-      { type: 'context', content: '  replicas: 3' },
-      { type: 'context', content: '  selector:' },
-      { type: 'context', content: '    matchLabels:' },
-      { type: 'context', content: '      app: payment-service' },
-      { type: 'context', content: '  template:' },
-      { type: 'context', content: '    metadata:' },
-      { type: 'context', content: '      labels:' },
-      { type: 'context', content: '        app: payment-service' },
-      { type: 'context', content: '    spec:' },
-      { type: 'context', content: '      containers:' },
-      { type: 'context', content: '      - name: payment-service' },
-      { type: 'context', content: '        image: myregistry.io/payment-service:v1.2.3' },
-      { type: 'context', content: '        ports:' },
-      { type: 'context', content: '        - containerPort: 8080' },
-      { type: 'context', content: '        securityContext:' },
-      { type: 'removed', content: '          privileged: true' },
-      { type: 'added', content: '          # Fix: Disable privileged mode to maintain container isolation' },
-      { type: 'added', content: '          privileged: false' },
-      { type: 'added', content: '          # Fix: explicitly prevent privilege escalation' },
-      { type: 'added', content: '          allowPrivilegeEscalation: false' },
-      { type: 'added', content: '          # Fix: enforce running as a non-root user' },
-      { type: 'added', content: '          runAsNonRoot: true' },
-      { type: 'added', content: '          # Fix: prevent modifications to the container filesystem' },
-      { type: 'added', content: '          readOnlyRootFilesystem: true' },
-      { type: 'context', content: '        resources:' },
-      { type: 'context', content: '          requests:' },
-      { type: 'context', content: '            cpu: 200m' },
-      { type: 'context', content: '            memory: 256Mi' },
-      { type: 'context', content: '          limits:' },
-      { type: 'context', content: '            cpu: 500m' },
-      { type: 'context', content: '            memory: 512Mi' },
+export function setActiveDemoUser(username) {
+  activeUsername = DEMO_USERS[username] ? username : 'admin';
+}
+
+function getActiveUser() {
+  return DEMO_USERS[activeUsername] || DEMO_USERS.admin;
+}
+
+function filterByUserNamespaces(items, nsKey = 'namespace') {
+  const user = getActiveUser();
+  if (user.role === 'admin' || user.permissions?.all_namespaces) return items;
+  const allowed = new Set(user.permissions?.namespaces || []);
+  return items.filter((it) => allowed.has(it[nsKey]));
+}
+
+const nowIso = () => new Date().toISOString();
+
+// --- Stateful Mock Stores ---
+
+let mockFailedPods = [
+  {
+    id: 1,
+    pod_name: 'inventory-sync-5f9b4c8d-x7qz9',
+    namespace: 'production',
+    node_name: 'worker-node-1',
+    phase: 'Running',
+    failure_reason: 'CrashLoopBackOff',
+    failure_message: 'Back-off restarting failed container inventory-sync',
+    status: 'investigating',
+    timestamp: nowIso(),
+    created_at: nowIso(),
+    logs_captured: true,
+    solution: `**Root Cause:** \`inventory-sync\` is exiting with HTTP 401 Unauthorized because \`API_TOKEN\` is missing from the container environment.\n\n**Fix:** Create the secret and mount it via \`secretKeyRef\`:\n\`\`\`bash\nkubectl create secret generic api-auth-secret --from-literal=token=<token> -n production\n\`\`\``,
+    manifest: `apiVersion: v1\nkind: Pod\nmetadata:\n  name: inventory-sync-5f9b4c8d-x7qz9\n  namespace: production\nspec:\n  containers:\n  - name: inventory-sync\n    image: ghcr.io/acme/inventory-sync:v2.1.0\n    resources:\n      requests:\n        cpu: 100m\n        memory: 128Mi`,
+    container_statuses: [
+      { name: 'inventory-sync', ready: false, restart_count: 14, state: 'waiting', reason: 'CrashLoopBackOff', image: 'ghcr.io/acme/inventory-sync:v2.1.0' },
     ],
-    fixed_manifest: `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: payment-service
-  template:
-    metadata:
-      labels:
-        app: payment-service
-    spec:
-      containers:
-      - name: payment-service
-        image: myregistry.io/payment-service:v1.2.3
-        ports:
-        - containerPort: 8080
-        securityContext:
-          privileged: false
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          readOnlyRootFilesystem: true
-        resources:
-          requests:
-            cpu: 200m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi`,
-    explanation: "The container is running in privileged mode, which grants it full access to the host's devices and breaks container isolation. The fix disables privileged mode, prevents privilege escalation, enforces running as a non-root user, and sets the root filesystem to read-only."
+    events: [
+      { type: 'Warning', reason: 'BackOff', message: 'Back-off restarting failed container inventory-sync', timestamp: nowIso() },
+    ],
+    logs: `[INFO] Starting inventory-sync v2.1.0...\n[FATAL] 401 Unauthorized: missing API_TOKEN`,
+  },
+  {
+    id: 2,
+    pod_name: 'stripe-webhook-worker-7c4d9b-m9k2p',
+    namespace: 'payments',
+    node_name: 'worker-node-2',
+    phase: 'Running',
+    failure_reason: 'OOMKilled',
+    failure_message: 'Container webhook-worker exceeded memory limit (256Mi)',
+    status: 'new',
+    timestamp: new Date(Date.now() - 420000).toISOString(),
+    created_at: new Date(Date.now() - 420000).toISOString(),
+    logs_captured: true,
+    solution: `**Root Cause:** \`stripe-webhook-worker\` hit its 256Mi memory limit during batch reconciliation.\n\n**Fix:** Increase \`resources.limits.memory\` to \`512Mi\` and \`requests.memory\` to \`256Mi\`.`,
+    manifest: `apiVersion: v1\nkind: Pod\nmetadata:\n  name: stripe-webhook-worker-7c4d9b-m9k2p\n  namespace: payments\nspec:\n  containers:\n  - name: webhook-worker\n    image: ghcr.io/acme/stripe-webhook:v1.8.2\n    resources:\n      limits:\n        memory: 256Mi`,
+    container_statuses: [
+      { name: 'webhook-worker', ready: false, restart_count: 6, state: 'terminated', reason: 'OOMKilled', exit_code: 137, image: 'ghcr.io/acme/stripe-webhook:v1.8.2' },
+    ],
+    events: [
+      { type: 'Warning', reason: 'OOMKilling', message: 'Memory cgroup out of memory: Killed process', timestamp: nowIso() },
+    ],
+    logs: `[INFO] Processing 4,200 webhook events...\n[ERROR] FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory`,
+  },
+  {
+    id: 3,
+    pod_name: 'postgres-replica-0',
+    namespace: 'database',
+    node_name: 'worker-node-3',
+    phase: 'Pending',
+    failure_reason: 'FailedScheduling',
+    failure_message: '0/3 nodes are available: 3 Insufficient memory.',
+    status: 'new',
+    timestamp: new Date(Date.now() - 900000).toISOString(),
+    created_at: new Date(Date.now() - 900000).toISOString(),
+    logs_captured: false,
+    solution: `**Root Cause:** No worker node has enough free allocatable memory for \`postgres-replica-0\` (requests 8Gi).\n\n**Fix:** Lower \`resources.requests.memory\` or scale the node pool.`,
+    manifest: `apiVersion: v1\nkind: Pod\nmetadata:\n  name: postgres-replica-0\n  namespace: database`,
+    container_statuses: [],
+    events: [
+      { type: 'Warning', reason: 'FailedScheduling', message: '0/3 nodes are available: 3 Insufficient memory.', timestamp: nowIso() },
+    ],
+    logs: '',
+  },
+];
+
+const mockLivePods = [
+  { name: 'api-gateway-6b8f9c-abc12', namespace: 'production', status: 'Running', ready: '1/1', restarts: 0, age: '12d', node: 'worker-node-1', containers: ['gateway'] },
+  { name: 'inventory-sync-5f9b4c8d-x7qz9', namespace: 'production', status: 'CrashLoopBackOff', ready: '0/1', restarts: 14, age: '2h', node: 'worker-node-1', containers: ['inventory-sync'] },
+  { name: 'checkout-api-8d9e7f-p4r2s', namespace: 'payments', status: 'Running', ready: '2/2', restarts: 1, age: '5d', node: 'worker-node-2', containers: ['checkout', 'envoy-sidecar'] },
+  { name: 'stripe-webhook-worker-7c4d9b-m9k2p', namespace: 'payments', status: 'OOMKilled', ready: '0/1', restarts: 6, age: '45m', node: 'worker-node-2', containers: ['webhook-worker'] },
+  { name: 'postgres-primary-0', namespace: 'database', status: 'Running', ready: '1/1', restarts: 0, age: '40d', node: 'worker-node-3', containers: ['postgres'] },
+];
+
+let mockSecurityFindings = [
+  {
+    id: 101,
+    resource_type: 'Deployment',
+    resource_name: 'inventory-sync',
+    namespace: 'production',
+    severity: 'HIGH',
+    rule_id: 'KSV013',
+    title: 'Container runs as root',
+    description: 'Container inventory-sync does not set securityContext.runAsNonRoot: true.',
+    remediation: 'Set securityContext.runAsNonRoot: true and runAsUser: 1001.',
+    dismissed: false,
+    timestamp: nowIso(),
+  },
+  {
+    id: 102,
+    resource_type: 'Deployment',
+    resource_name: 'checkout-api',
+    namespace: 'payments',
+    severity: 'CRITICAL',
+    rule_id: 'KSV014',
+    title: 'Root filesystem is not read-only',
+    description: 'Container checkout allows writes to the root filesystem.',
+    remediation: 'Set securityContext.readOnlyRootFilesystem: true.',
+    dismissed: false,
+    timestamp: nowIso(),
+  },
+  {
+    id: 103,
+    resource_type: 'StatefulSet',
+    resource_name: 'postgres-primary',
+    namespace: 'database',
+    severity: 'MEDIUM',
+    rule_id: 'KSV111',
+    title: 'Missing NetworkPolicy',
+    description: 'Workload postgres-primary is not selected by any NetworkPolicy.',
+    remediation: 'Create a NetworkPolicy restricting ingress on port 5432.',
+    dismissed: false,
+    timestamp: nowIso(),
+  },
+];
+
+let mockAdviceFindings = [
+  {
+    id: 201,
+    detector_id: 'oom-prone-memory-headroom',
+    severity: 'high',
+    category: 'reliability',
+    title: 'Tight memory headroom on stripe-webhook-worker',
+    summary: 'Memory limit (256Mi) leaves <10% headroom above observed peak usage.',
+    resource_kind: 'Deployment',
+    resource_name: 'stripe-webhook-worker',
+    namespace: 'payments',
+    evidence: { limit: '256Mi', peak: '248Mi' },
+    recommended_change: 'Increase memory limit to 512Mi and request to 256Mi.',
+    confidence: 0.94,
+    timestamp: nowIso(),
+    dismissed: false,
+  },
+  {
+    id: 202,
+    detector_id: 'single-replica-behind-service',
+    severity: 'medium',
+    category: 'availability',
+    title: 'Single replica behind production Service',
+    summary: 'Deployment api-gateway has replicas=1 behind a production Service.',
+    resource_kind: 'Deployment',
+    resource_name: 'api-gateway',
+    namespace: 'production',
+    evidence: { replicas: 1, service: 'api-gateway-svc' },
+    recommended_change: 'Increase replicas to >= 2 and add a PodDisruptionBudget.',
+    confidence: 0.91,
+    timestamp: nowIso(),
+    dismissed: false,
+  },
+];
+
+let mockLLMConfigs = [
+  {
+    id: 1,
+    name: 'GitHub Copilot (Production)',
+    provider: 'copilot',
+    model: 'openai/gpt-5.5-mini',
+    base_url: 'https://models.github.ai/inference',
+    reasoning_effort: 'medium',
+    proxy_url: 'http://proxy.corp.local:8080',
+    is_default: true,
+    is_active: true,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+  {
+    id: 2,
+    name: 'Local Ollama (Air-Gapped)',
+    provider: 'ollama',
+    model: 'llama3.2',
+    base_url: 'http://ollama.ai.svc:11434',
+    reasoning_effort: null,
+    proxy_url: null,
+    is_default: false,
+    is_active: true,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+];
+
+let mockTeams = [
+  {
+    id: 1,
+    name: 'team_1',
+    description: 'Production Platform Team',
+    access_level: 'write',
+    all_namespaces: false,
+    namespaces: ['production'],
+    tabs: ['pod_monitoring', 'security_scanner', 'ai_advice'],
+    members: [{ id: 2, username: 'user_1', email: 'user1@kuremonitor.com', role: 'member' }],
+  },
+  {
+    id: 2,
+    name: 'team_2',
+    description: 'Payments Engineering Team',
+    access_level: 'read',
+    all_namespaces: false,
+    namespaces: ['payments'],
+    tabs: ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice'],
+    members: [{ id: 3, username: 'user_2', email: 'user2@kuremonitor.com', role: 'member' }],
+  },
+];
+
+let mockAuditRetentionDays = 90;
+let mockAuditLogs = [
+  {
+    id: 3,
+    created_at: new Date(Date.now() - 120000).toISOString(),
+    actor_id: 1,
+    actor_username: 'admin',
+    actor_role: 'admin',
+    action: 'llm_config.update',
+    resource_type: 'llm_config',
+    resource_name: 'GitHub Copilot (Production)',
+    ip_address: '10.244.0.15',
+    status: 'success',
+    details: { method: 'PUT', path: '/api/admin/llm/configs/1', payload: { reasoning_effort: 'medium', proxy_url: 'http://proxy.corp.local:8080', api_key: '[REDACTED]' } },
+  },
+  {
+    id: 2,
+    created_at: new Date(Date.now() - 600000).toISOString(),
+    actor_id: 2,
+    actor_username: 'user_1',
+    actor_role: 'member',
+    action: 'pod.dismiss',
+    resource_type: 'pod_failure',
+    resource_name: 'production/cache-warmer-7f8a',
+    ip_address: '10.244.1.22',
+    status: 'success',
+    details: { method: 'DELETE', path: '/api/pods/failed/42', status_code: 200 },
+  },
+  {
+    id: 1,
+    created_at: new Date(Date.now() - 1800000).toISOString(),
+    actor_id: 1,
+    actor_username: 'admin',
+    actor_role: 'admin',
+    action: 'team.create',
+    resource_type: 'team',
+    resource_name: 'team_2',
+    ip_address: '10.244.0.15',
+    status: 'success',
+    details: { method: 'POST', path: '/api/admin/teams', payload: { name: 'team_2', namespaces: ['payments'], access_level: 'read' } },
+  },
+];
+
+function recordDemoAudit(action, resource_type, resource_name, details = {}) {
+  const u = getActiveUser();
+  mockAuditLogs = [
+    {
+      id: Date.now(),
+      created_at: nowIso(),
+      actor_id: u.id,
+      actor_username: u.username,
+      actor_role: u.role,
+      action,
+      resource_type,
+      resource_name,
+      ip_address: '127.0.0.1',
+      status: 'success',
+      details,
+    },
+    ...mockAuditLogs,
+  ];
+}
+
+const NAMESPACE_DIAGRAMS = {
+  production: {
+    nodes: [
+      { id: 'ing-prod', kind: 'Ingress', name: 'prod-ingress', namespace: 'production', status: 'Active' },
+      { id: 'svc-api', kind: 'Service', name: 'api-gateway-svc', namespace: 'production', status: 'ClusterIP' },
+      { id: 'dep-api', kind: 'Deployment', name: 'api-gateway', namespace: 'production', status: '1/1 Ready' },
+      { id: 'rs-api', kind: 'ReplicaSet', name: 'api-gateway-6b8f9c', namespace: 'production', status: '1/1' },
+      { id: 'pod-api', kind: 'Pod', name: 'api-gateway-6b8f9c-abc12', namespace: 'production', status: 'Running' },
+      { id: 'dep-inv', kind: 'Deployment', name: 'inventory-sync', namespace: 'production', status: '0/1 Ready' },
+      { id: 'pod-inv', kind: 'Pod', name: 'inventory-sync-5f9b4c8d-x7qz9', namespace: 'production', status: 'CrashLoopBackOff' },
+      { id: 'cm-prod', kind: 'ConfigMap', name: 'prod-config', namespace: 'production', status: 'Active' },
+      { id: 'sec-prod', kind: 'Secret', name: 'api-auth-secret', namespace: 'production', status: 'Derived', metadata: { derived: true } },
+    ],
+    edges: [
+      { source: 'ing-prod', target: 'svc-api', type: 'routes' },
+      { source: 'svc-api', target: 'pod-api', type: 'selects' },
+      { source: 'dep-api', target: 'rs-api', type: 'owns' },
+      { source: 'rs-api', target: 'pod-api', type: 'owns' },
+      { source: 'pod-api', target: 'cm-prod', type: 'mounts' },
+      { source: 'dep-inv', target: 'pod-inv', type: 'owns' },
+      { source: 'pod-inv', target: 'sec-prod', type: 'mounts' },
+    ],
+    groups: [],
+  },
+  payments: {
+    nodes: [
+      { id: 'ing-pay', kind: 'Ingress', name: 'payments-ingress', namespace: 'payments', status: 'Active' },
+      { id: 'svc-chk', kind: 'Service', name: 'checkout-api-svc', namespace: 'payments', status: 'ClusterIP' },
+      { id: 'dep-chk', kind: 'Deployment', name: 'checkout-api', namespace: 'payments', status: '2/2 Ready' },
+      { id: 'pod-chk', kind: 'Pod', name: 'checkout-api-8d9e7f-p4r2s', namespace: 'payments', status: 'Running' },
+      { id: 'dep-wh', kind: 'Deployment', name: 'stripe-webhook-worker', namespace: 'payments', status: '0/1 Ready' },
+      { id: 'pod-wh', kind: 'Pod', name: 'stripe-webhook-worker-7c4d9b-m9k2p', namespace: 'payments', status: 'OOMKilled' },
+      { id: 'np-pay', kind: 'NetworkPolicy', name: 'payments-egress-lock', namespace: 'payments', status: 'Active' },
+      { id: 'sec-stripe', kind: 'Secret', name: 'stripe-signing-key', namespace: 'payments', status: 'Derived', metadata: { derived: true } },
+    ],
+    edges: [
+      { source: 'ing-pay', target: 'svc-chk', type: 'routes' },
+      { source: 'svc-chk', target: 'pod-chk', type: 'selects' },
+      { source: 'dep-chk', target: 'pod-chk', type: 'owns' },
+      { source: 'dep-wh', target: 'pod-wh', type: 'owns' },
+      { source: 'pod-wh', target: 'sec-stripe', type: 'mounts' },
+      { source: 'np-pay', target: 'pod-chk', type: 'policy' },
+    ],
+    groups: [],
+  },
+  database: {
+    nodes: [
+      { id: 'svc-pg', kind: 'Service', name: 'postgres-svc', namespace: 'database', status: 'ClusterIP' },
+      { id: 'sts-pg', kind: 'StatefulSet', name: 'postgres-primary', namespace: 'database', status: '1/1 Ready' },
+      { id: 'pod-pg', kind: 'Pod', name: 'postgres-primary-0', namespace: 'database', status: 'Running' },
+      { id: 'pvc-pg', kind: 'PersistentVolumeClaim', name: 'pg-data-0', namespace: 'database', status: 'Bound' },
+    ],
+    edges: [
+      { source: 'svc-pg', target: 'pod-pg', type: 'selects' },
+      { source: 'sts-pg', target: 'pod-pg', type: 'owns' },
+      { source: 'pod-pg', target: 'pvc-pg', type: 'mounts' },
+    ],
+    groups: [],
+  },
+};
+
+export const api = {
+  // Auth
+  getAuthSetupRequired: async () => ({ setup_required: false }),
+  getAuthMe: async () => ({ user: getActiveUser() }),
+  login: async ({ username }) => {
+    setActiveDemoUser(username);
+    return { user: getActiveUser() };
+  },
+  logout: async () => ({ ok: true }),
+
+  // Config
+  getConfig: async () => ({
+    ai_enabled: true,
+    ai_provider: 'copilot',
+    features: {
+      pod_monitoring: true,
+      security_scan: true,
+      diagram: true,
+      ai_advice: true,
+    },
   }),
+
+  // Pods
+  getFailedPods: async () => filterByUserNamespaces(mockFailedPods),
+  getLivePods: async (namespace = null) => {
+    let pods = filterByUserNamespaces(mockLivePods);
+    if (namespace) pods = pods.filter((p) => p.namespace === namespace);
+    const namespaces = Array.from(new Set(filterByUserNamespaces(mockLivePods).map((p) => p.namespace))).sort();
+    return { pods, namespaces };
+  },
+  dismissPodFailure: async (id) => {
+    const pod = mockFailedPods.find((p) => p.id === id);
+    mockFailedPods = mockFailedPods.filter((p) => p.id !== id);
+    recordDemoAudit('pod.dismiss', 'pod_failure', pod ? `${pod.namespace}/${pod.pod_name}` : String(id));
+    return { ok: true };
+  },
+  retryPodSolution: async (id) => mockFailedPods.find((p) => p.id === id) || {},
+  retrySolution: async (id) => mockFailedPods.find((p) => p.id === id) || {},
+  troubleshootPod: async (id) => ({
+    solution: 'AI Troubleshoot: Verified container exit code and events. Apply the recommended manifest patch and redeploy.',
+    provider: 'copilot',
+    model: 'openai/gpt-5.5-mini',
+  }),
+  getPodManifest: async (ns, name) => {
+    const found = mockFailedPods.find((p) => p.namespace === ns && p.pod_name === name);
+    return { manifest: found?.manifest || `apiVersion: v1\nkind: Pod\nmetadata:\n  name: ${name}\n  namespace: ${ns}` };
+  },
+  getPodLogs: async (ns, podName) => {
+    const found = mockFailedPods.find((p) => p.namespace === ns && p.pod_name === podName);
+    const live = mockLivePods.find((p) => p.namespace === ns && p.name === podName);
+    const containers = live?.containers || found?.container_statuses?.map((c) => c.name) || ['app'];
+    const sampleLogs = found?.logs || [
+      `2026-11-27T12:10:01Z INFO  Starting ${podName} in namespace ${ns}...`,
+      `2026-11-27T12:10:02Z INFO  Loaded configuration from /etc/app/config.yaml`,
+      `2026-11-27T12:10:03Z INFO  Listening on :8080 (metrics on :9090)`,
+      `2026-11-27T12:15:14Z INFO  GET /healthz 200 OK (1.2ms)`,
+      `2026-11-27T12:18:42Z INFO  GET /api/v1/status 200 OK (3.8ms)`,
+    ].join('\n');
+    return {
+      logs: sampleLogs,
+      containers,
+      container: containers[0],
+    };
+  },
+
+  // Security Scanner
+  getSecurityFindings: async () => ({ findings: filterByUserNamespaces(mockSecurityFindings) }),
+  getSecurityFindingManifest: async (id) => {
+    const f = mockSecurityFindings.find((item) => item.id === id);
+    const kind = f?.resource_type || 'Deployment';
+    const name = f?.resource_name || 'workload';
+    const ns = f?.namespace || 'default';
+    return {
+      manifest: `apiVersion: apps/v1\nkind: ${kind}\nmetadata:\n  name: ${name}\n  namespace: ${ns}\nspec:\n  replicas: 2\n  template:\n    spec:\n      containers:\n      - name: ${name}\n        image: ghcr.io/acme/${name}:v1.0.0\n        securityContext:\n          runAsNonRoot: false\n          readOnlyRootFilesystem: false\n          allowPrivilegeEscalation: true`,
+    };
+  },
+  generateSecurityFix: async (id) => {
+    const f = mockSecurityFindings.find((item) => item.id === id);
+    const kind = f?.resource_type || 'Deployment';
+    const name = f?.resource_name || 'workload';
+    const ns = f?.namespace || 'default';
+    return {
+      fixed_manifest: `apiVersion: apps/v1\nkind: ${kind}\nmetadata:\n  name: ${name}\n  namespace: ${ns}\nspec:\n  replicas: 2\n  template:\n    spec:\n      containers:\n      - name: ${name}\n        image: ghcr.io/acme/${name}:v1.0.0\n        securityContext:\n          runAsNonRoot: true\n          runAsUser: 1001\n          readOnlyRootFilesystem: true\n          allowPrivilegeEscalation: false\n          capabilities:\n            drop:\n            - ALL`,
+      diff: [
+        { type: 'unchanged', content: 'apiVersion: apps/v1' },
+        { type: 'unchanged', content: `kind: ${kind}` },
+        { type: 'unchanged', content: 'metadata:' },
+        { type: 'unchanged', content: `  name: ${name}` },
+        { type: 'unchanged', content: `  namespace: ${ns}` },
+        { type: 'unchanged', content: 'spec:' },
+        { type: 'unchanged', content: '  replicas: 2' },
+        { type: 'unchanged', content: '  template:' },
+        { type: 'unchanged', content: '    spec:' },
+        { type: 'unchanged', content: '      containers:' },
+        { type: 'unchanged', content: `      - name: ${name}` },
+        { type: 'unchanged', content: `        image: ghcr.io/acme/${name}:v1.0.0` },
+        { type: 'unchanged', content: '        securityContext:' },
+        { type: 'removed', content: '          runAsNonRoot: false' },
+        { type: 'removed', content: '          readOnlyRootFilesystem: false' },
+        { type: 'removed', content: '          allowPrivilegeEscalation: true' },
+        { type: 'added', content: '          runAsNonRoot: true' },
+        { type: 'added', content: '          runAsUser: 1001' },
+        { type: 'added', content: '          readOnlyRootFilesystem: true' },
+        { type: 'added', content: '          allowPrivilegeEscalation: false' },
+        { type: 'added', content: '          capabilities:' },
+        { type: 'added', content: '            drop:' },
+        { type: 'added', content: '            - ALL' },
+      ],
+      explanation: `Hardened securityContext for ${name} (${f?.rule_id || 'Security Rule'}): enforces non-root execution (UID 1001), read-only root filesystem, disables privilege escalation, and drops all Linux capabilities.`,
+      is_fallback: false,
+      provider: 'copilot',
+      model: 'openai/gpt-5.5-mini',
+    };
+  },
+  dismissSecurityFinding: async (id) => {
+    mockSecurityFindings = mockSecurityFindings.map((f) => (f.id === id ? { ...f, dismissed: true } : f));
+    recordDemoAudit('security_finding.dismiss', 'security_finding', String(id));
+    return { ok: true };
+  },
+  restoreSecurityFinding: async (id) => {
+    mockSecurityFindings = mockSecurityFindings.map((f) => (f.id === id ? { ...f, dismissed: false } : f));
+    recordDemoAudit('security_finding.restore', 'security_finding', String(id));
+    return { ok: true };
+  },
+  triggerSecurityRescan: async () => {
+    recordDemoAudit('security.rescan', 'security_scan', 'cluster');
+    return { status: 'started' };
+  },
 
   // Diagram
-  getDiagramNamespaces: async () => ({ namespaces: ['production', 'database', 'default'] }),
-  getDiagramWorkloads: async (namespace, kind) => {
-    if (kind === 'Deployment') return { workloads: ['frontend', 'payment-service'] };
-    if (kind === 'StatefulSet') return { workloads: ['redis-cache'] };
-    return { workloads: [] };
+  getDiagramNamespaces: async () => {
+    const all = ['production', 'payments', 'database'];
+    const u = getActiveUser();
+    if (u.role === 'admin' || u.permissions?.all_namespaces) return { namespaces: all };
+    const allowed = new Set(u.permissions?.namespaces || []);
+    return { namespaces: all.filter((ns) => allowed.has(ns)) };
   },
-  getDiagramNamespace: async (namespace) => ({
-    scope: 'namespace',
-    root_id: null,
-    nodes: [
-      { id: 'ing-1', kind: 'Ingress', name: 'frontend-ingress', namespace, status: 'healthy' },
-      { id: 'svc-1', kind: 'Service', name: 'frontend-svc', namespace, status: 'healthy' },
-      { id: 'dep-1', kind: 'Deployment', name: 'frontend', namespace, status: 'healthy', metadata: { replicas: 2 } },
-      { id: 'rs-1', kind: 'ReplicaSet', name: 'frontend-7d9b', namespace },
-      { id: 'pod-1', kind: 'Pod', name: 'frontend-7d9b-x1', namespace, status: 'Running' },
-      { id: 'pod-2', kind: 'Pod', name: 'frontend-7d9b-y2', namespace, status: 'Running' },
-      
-      { id: 'svc-2', kind: 'Service', name: 'payment-svc', namespace, status: 'healthy' },
-      { id: 'dep-2', kind: 'Deployment', name: 'payment-service', namespace, status: 'degraded', metadata: { replicas: 1 } },
-      { id: 'rs-2', kind: 'ReplicaSet', name: 'payment-5c4a', namespace },
-      { id: 'pod-3', kind: 'Pod', name: 'payment-5c4a-z1', namespace, status: 'CrashLoopBackOff' },
-
-      { id: 'svc-3', kind: 'Service', name: 'redis-svc', namespace: 'database', status: 'healthy' },
-      { id: 'sts-1', kind: 'StatefulSet', name: 'redis-cache', namespace: 'database', status: 'healthy' },
-      { id: 'pod-4', kind: 'Pod', name: 'redis-cache-0', namespace: 'database', status: 'Running' },
-    ],
-    edges: [
-      { source: 'ing-1', target: 'svc-1', type: 'routes' },
-      { source: 'svc-1', target: 'pod-1', type: 'selects' },
-      { source: 'svc-1', target: 'pod-2', type: 'selects' },
-      { source: 'dep-1', target: 'rs-1', type: 'owns' },
-      { source: 'rs-1', target: 'pod-1', type: 'owns' },
-      { source: 'rs-1', target: 'pod-2', type: 'owns' },
-      
-      { source: 'pod-1', target: 'svc-2', type: 'network' },
-      { source: 'pod-2', target: 'svc-2', type: 'network' },
-      { source: 'svc-2', target: 'pod-3', type: 'selects' },
-      { source: 'dep-2', target: 'rs-2', type: 'owns' },
-      { source: 'rs-2', target: 'pod-3', type: 'owns' },
-
-      { source: 'pod-3', target: 'svc-3', type: 'network' },
-      { source: 'svc-3', target: 'pod-4', type: 'selects' },
-      { source: 'sts-1', target: 'pod-4', type: 'owns' },
-    ],
-    groups: [
-      { id: 'g-frontend', label: 'Frontend App', node_ids: ['dep-1', 'rs-1', 'pod-1', 'pod-2'] },
-      { id: 'g-payment', label: 'Payment API', node_ids: ['dep-2', 'rs-2', 'pod-3'] },
-      { id: 'g-redis', label: 'Redis Cache', node_ids: ['sts-1', 'pod-4'] }
-    ]
-  }),
-  getDiagramWorkload: async (namespace, kind, name) => {
-    const data = await api.getDiagramNamespace(namespace);
-    data.scope = 'workload';
-    return data;
+  getDiagramNamespace: async (ns) => {
+    const u = getActiveUser();
+    if (u.role !== 'admin' && !u.permissions?.all_namespaces && !(u.permissions?.namespaces || []).includes(ns)) {
+      const err = new Error('Forbidden');
+      err.status = 403;
+      throw err;
+    }
+    return NAMESPACE_DIAGRAMS[ns] || { nodes: [], edges: [], groups: [] };
   },
-  getDiagramRoles: async () => ({
-    roles: [
-      { namespace: 'production', name: 'app-reader' },
-      { namespace: 'database', name: 'db-admin' }
-    ],
-    cluster_roles: [
-      { name: 'cluster-admin' },
-      { name: 'view' }
-    ]
+  getDiagramWorkloads: async (ns, kind) => {
+    const d = NAMESPACE_DIAGRAMS[ns];
+    if (!d) return { workloads: [] };
+    return { workloads: d.nodes.filter((n) => n.kind === kind).map((n) => n.name) };
+  },
+  getDiagramWorkload: async (ns, kind, name) => {
+    const d = NAMESPACE_DIAGRAMS[ns];
+    const match = d?.nodes?.find((n) => n.kind === kind && n.name === name);
+    if (!match) {
+      const err = new Error('HTTP error! status: 404');
+      err.status = 404;
+      throw err;
+    }
+    return d;
+  },
+  getDiagramRoles: async () => ({ roles: [], cluster_roles: [] }),
+  getResourceManifest: async (ns, kind, name) => ({
+    manifest: `apiVersion: v1\nkind: ${kind}\nmetadata:\n  name: ${name}\n  namespace: ${ns}`,
   }),
-  getDiagramRole: async (namespace, name) => ({
-    scope: 'role',
-    nodes: [
-      { id: 'role-1', kind: 'Role', name, namespace },
-      { id: 'sa-1', kind: 'ServiceAccount', name: 'default', namespace },
-      { id: 'rb-1', kind: 'RoleBinding', name: `${name}-binding`, namespace }
-    ],
-    edges: [
-      { source: 'rb-1', target: 'role-1', type: 'references' },
-      { source: 'rb-1', target: 'sa-1', type: 'binds' }
-    ],
-    groups: []
-  }),
-  getDiagramClusterRole: async (name) => ({
-    scope: 'cluster-role',
-    nodes: [
-      { id: 'cr-1', kind: 'ClusterRole', name },
-      { id: 'user-1', kind: 'User', name: 'admin@company.com' },
-      { id: 'crb-1', kind: 'ClusterRoleBinding', name: `${name}-binding` }
-    ],
-    edges: [
-      { source: 'crb-1', target: 'cr-1', type: 'references' },
-      { source: 'crb-1', target: 'user-1', type: 'binds' }
-    ],
-    groups: []
-  }),
-  
-  // Advice
+
+  // AI Advice
   getAdviceFindings: async (params = {}) => {
-    const mockFindings = [
-      {
-        id: 'adv-1',
-        detector_id: 'deployment-should-be-daemonset',
-        severity: 'high',
-        category: 'workload-pattern',
-        title: 'Deployment resembles a DaemonSet pattern',
-        summary: 'This Deployment is scheduled on every single node using node anti-affinity. This is an anti-pattern; DaemonSets are designed specifically for this use case.',
-        resource_kind: 'Deployment',
-        resource_name: 'log-forwarder',
-        namespace: 'kube-system',
-        evidence: {
-          pod_anti_affinity_used: true,
-          topology_key: 'kubernetes.io/hostname',
-          replicas: 10,
-          total_cluster_nodes: 10
-        },
-        recommended_change: 'Convert this Deployment into a DaemonSet. Remove the replicas field and the podAntiAffinity scheduling rules.',
-        confidence: 0.95,
-        explanation: 'The Kubernetes scheduler is currently being forced to place exactly one replica of `log-forwarder` on every node using complex anti-affinity rules. A DaemonSet inherently guarantees exactly one pod per matching node, which is much more efficient for the scheduler, natively handles nodes joining/leaving the cluster, and eliminates the need to manually manage replica counts.',
-        timestamp: new Date().toISOString(),
-        dismissed: false
-      },
-      {
-        id: 'adv-2',
-        detector_id: 'missing-liveness-probe',
-        severity: 'medium',
-        category: 'reliability',
-        title: 'Missing liveness probe',
-        summary: 'The frontend deployment is missing a liveness probe, which means Kubernetes cannot automatically restart it if it hangs.',
-        resource_kind: 'Deployment',
-        resource_name: 'frontend',
-        namespace: 'production',
-        evidence: {
-          containers_without_liveness: ['nginx']
-        },
-        recommended_change: 'Add a livenessProbe to the nginx container definition, for example probing the /healthz endpoint.',
-        confidence: 0.85,
-        timestamp: new Date().toISOString(),
-        dismissed: false
-      },
-      {
-        id: 'adv-3',
-        detector_id: 'over-provisioned-cpu',
-        severity: 'low',
-        category: 'efficiency',
-        title: 'Significantly over-provisioned CPU requests',
-        summary: 'The payment-service is requesting 2000m CPU but historical usage rarely exceeds 150m.',
-        resource_kind: 'Deployment',
-        resource_name: 'payment-service',
-        namespace: 'production',
-        evidence: {
-          requested_cpu: '2000m',
-          p99_cpu_usage: '142m',
-          waste_ratio: '14x'
-        },
-        recommended_change: 'Reduce CPU requests from 2000m to 250m. This will free up cluster capacity while maintaining a safe buffer.',
-        confidence: 0.92,
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        dismissed: true
-      }
-    ];
-
-    let filtered = mockFindings;
-    if (params.namespace) {
-      filtered = filtered.filter(f => f.namespace === params.namespace);
-    }
-    if (params.dismissed_only) {
-      filtered = filtered.filter(f => f.dismissed === true);
-    } else {
-      filtered = filtered.filter(f => f.dismissed === false);
-    }
-
+    let filtered = filterByUserNamespaces(mockAdviceFindings);
+    if (params.namespace) filtered = filtered.filter((f) => f.namespace === params.namespace);
+    if (params.dismissed_only) filtered = filtered.filter((f) => f.dismissed);
+    else if (!params.include_dismissed) filtered = filtered.filter((f) => !f.dismissed);
     return { findings: filtered };
   },
   getAdviceDetectors: async () => ({ detectors: [], hubble_status: { available: true } }),
-  runAdviceScan: async (scope) => ({ scan_id: 'scan-123' }),
-  dismissAdviceFinding: async (id) => ({ success: true }),
-  restoreAdviceFinding: async (id) => ({ success: true }),
-  downloadAdviceFindings: async (format, params) => {},
+  runAdviceScan: async () => ({ scan_id: 'demo-scan-1' }),
+  dismissAdviceFinding: async (id) => {
+    mockAdviceFindings = mockAdviceFindings.map((f) => (f.id === id ? { ...f, dismissed: true } : f));
+    return { ok: true };
+  },
+  restoreAdviceFinding: async (id) => {
+    mockAdviceFindings = mockAdviceFindings.map((f) => (f.id === id ? { ...f, dismissed: false } : f));
+    return { ok: true };
+  },
   explainAdviceFinding: async (id) => ({
     id,
-    explanation: 'This is an AI-generated explanation providing deep context about why this is an issue and how exactly you should fix it. In a real environment, this text streams in from the configured LLM provider based on the resources current state and the configured rules.'
+    explanation: 'AI Explanation: Raising the memory limit and adding a PodDisruptionBudget prevents cascading restarts during traffic spikes.',
   }),
-  
-  // Mirrors
-  getActiveMirrors: async () => ([]),
-  
-  // Settings & Admin
-  getLLMStatus: async () => ({ configured: true, provider: 'openai', model: 'gpt-4o' }),
-  getAllNamespaces: async () => (['default', 'production', 'database', 'kube-system']),
-  getExcludedNamespaces: async () => ([]),
-  getExcludedPods: async () => ([]),
-  getExcludedRules: async () => ([]),
-  getAllRuleTitles: async () => (['KSV013', 'KSV014', 'KSV111']),
-  getMonitoredPods: async () => ([]),
-  getTrustedRegistries: async () => ([]),
-  getNotificationSettings: async () => ([
+  downloadAdviceFindings: async () => {},
+
+  // Mirrors (Test Fix)
+  getActiveMirrors: async () => [],
+  previewMirrorPod: async (podId) => {
+    const pod = mockFailedPods.find((p) => p.id === podId) || mockFailedPods[0];
+    const isOom = pod.failure_reason === 'OOMKilled';
+    const fixedManifest = isOom
+      ? `apiVersion: v1\nkind: Pod\nmetadata:\n  name: ${pod.pod_name}-mirror\n  namespace: ${pod.namespace}\nspec:\n  containers:\n  - name: webhook-worker\n    image: ghcr.io/acme/stripe-webhook:v1.8.2\n    resources:\n      requests:\n        memory: 256Mi\n      limits:\n        memory: 512Mi`
+      : `apiVersion: v1\nkind: Pod\nmetadata:\n  name: ${pod.pod_name}-mirror\n  namespace: ${pod.namespace}\nspec:\n  containers:\n  - name: inventory-sync\n    image: ghcr.io/acme/inventory-sync:v2.1.0\n    env:\n    - name: API_TOKEN\n      valueFrom:\n        secretKeyRef:\n          name: api-auth-secret\n          key: token\n    resources:\n      requests:\n        cpu: 100m\n        memory: 128Mi`;
+    return {
+      fixed_manifest: fixedManifest,
+      explanation: isOom
+        ? 'Increased memory limit from 256Mi to 512Mi and set 256Mi request to prevent OOMKilled exits.'
+        : 'Injected missing API_TOKEN from api-auth-secret so the container authenticates cleanly on startup.',
+    };
+  },
+  deployMirrorPod: async () => {
+    throw new Error('Mirror pod deployment is disabled in the interactive demo (read-only sandbox).');
+  },
+  getMirrorStatus: async () => ({ status: 'Running' }),
+  deleteMirrorPod: async () => ({ ok: true }),
+
+  // LLM Settings (Multi-LLM + Reasoning Effort + Proxy URL)
+  getLLMStatus: async () => ({ configured: true, provider: 'copilot', model: 'openai/gpt-5.5-mini' }),
+  getLLMConfigs: async () => ({ configs: mockLLMConfigs, default_config_id: mockLLMConfigs.find((c) => c.is_default)?.id || null }),
+  getAvailableLLMs: async () => ({ configs: mockLLMConfigs }),
+  createLLMConfig: async (payload) => {
+    const item = { id: Date.now(), ...payload, is_active: true, created_at: nowIso(), updated_at: nowIso() };
+    mockLLMConfigs = [...mockLLMConfigs, item];
+    recordDemoAudit('llm_config.create', 'llm_config', item.name || item.provider);
+    return item;
+  },
+  updateLLMConfig: async (id, payload) => {
+    mockLLMConfigs = mockLLMConfigs.map((c) => (c.id === id ? { ...c, ...payload, updated_at: nowIso() } : c));
+    recordDemoAudit('llm_config.update', 'llm_config', String(id));
+    return mockLLMConfigs.find((c) => c.id === id);
+  },
+  deleteLLMConfig: async (id) => {
+    mockLLMConfigs = mockLLMConfigs.filter((c) => c.id !== id);
+    recordDemoAudit('llm_config.delete', 'llm_config', String(id));
+    return { ok: true };
+  },
+  setDefaultLLMConfig: async (id) => {
+    mockLLMConfigs = mockLLMConfigs.map((c) => ({ ...c, is_default: c.id === id }));
+    recordDemoAudit('llm_config.set_default', 'llm_config', String(id));
+    return { ok: true };
+  },
+  testLLMConfig: async () => ({ success: true, message: 'Demo connection succeeded!' }),
+  getCustomInstructions: async () => ({ instructions: 'Always prefer Helm values.yaml diffs over raw kubectl patch commands.' }),
+  updateCustomInstructions: async (instructions) => ({ instructions }),
+  deleteCustomInstructions: async () => ({ instructions: '' }),
+
+  // Admin: Teams, Users, SSO, Exclusions, Notifications
+  getAllNamespaces: async () => ['production', 'payments', 'database', 'default'],
+  getClusterNamespaces: async () => ['production', 'payments', 'database', 'default'],
+  getTeams: async () => mockTeams,
+  addTeamMember: async (teamId, userId) => {
+    const u = Object.values(DEMO_USERS).find((usr) => usr.id === userId);
+    if (u) {
+      mockTeams = mockTeams.map((t) =>
+        t.id === teamId && !t.members.some((m) => m.id === userId)
+          ? { ...t, members: [...t.members, { id: u.id, username: u.username, email: u.email, role: u.role }] }
+          : t
+      );
+    }
+    return { ok: true };
+  },
+  removeTeamMember: async (teamId, userId) => {
+    mockTeams = mockTeams.map((t) =>
+      t.id === teamId ? { ...t, members: t.members.filter((m) => m.id !== userId) } : t
+    );
+    return { ok: true };
+  },
+  createTeam: async (payload) => {
+    const t = { id: Date.now(), members: [], ...payload };
+    mockTeams = [...mockTeams, t];
+    recordDemoAudit('team.create', 'team', t.name);
+    return t;
+  },
+  updateTeam: async (id, payload) => {
+    mockTeams = mockTeams.map((t) => (t.id === id ? { ...t, ...payload } : t));
+    recordDemoAudit('team.update', 'team', String(id));
+    return mockTeams.find((t) => t.id === id);
+  },
+  deleteTeam: async (id) => {
+    mockTeams = mockTeams.filter((t) => t.id !== id);
+    recordDemoAudit('team.delete', 'team', String(id));
+    return { ok: true };
+  },
+  getUsers: async () => Object.values(DEMO_USERS),
+  getInvitations: async () => [],
+  getAdminSSOConfig: async () => ({
+    enabled: true,
+    server_url: 'https://keycloak.corp.local',
+    realm: 'kure-platform',
+    client_id: 'kure-monitor',
+    has_client_secret: true,
+    admin_role: 'kure-admin',
+    admin_group: '/platform-admins',
+    allowed_groups: 'platform-admins,devops,sre',
+    scopes: 'openid profile email',
+    insecure_skip_tls_verify: false,
+    source: 'database',
+  }),
+  updateAdminSSOConfig: async (cfg) => {
+    recordDemoAudit('sso.update', 'sso_config', cfg.realm || 'keycloak', {
+      enabled: cfg.enabled,
+      server_url: cfg.server_url,
+      realm: cfg.realm,
+      client_secret: cfg.client_secret ? '[REDACTED]' : null,
+    });
+    return { ...cfg, has_client_secret: true, source: 'database' };
+  },
+  getSSOConfig: async () => ({ enabled: true, server_url: 'https://keycloak.corp.local', realm: 'kure-platform', client_id: 'kure-monitor', admin_role: 'kure-admin' }),
+  saveSSOConfig: async (cfg) => cfg,
+  getExcludedNamespaces: async () => [],
+  getExcludedPods: async () => [],
+  getExcludedRules: async () => [],
+  getAllRuleTitles: async () => ['KSV013', 'KSV014', 'KSV111'],
+  getMonitoredPods: async () => [],
+  getTrustedRegistries: async () => ['ghcr.io/acme'],
+  getNotificationSettings: async () => [
     { provider: 'slack', enabled: false, config: { webhook_url: '' } },
     { provider: 'teams', enabled: false, config: { webhook_url: '' } },
-  ]),
-  getAuthSetupRequired: async () => ({ setup_required: false }),
-  getUsers: async () => ([{ id: 1, username: 'demo', email: 'demo@kuremonitor.com', role: 'admin' }]),
-  getInvitations: async () => ([]),
+  ],
+
+  // Audit Logs (Admin only)
+  getAuditLogs: async ({ action = '', search = '', limit = 50, offset = 0 } = {}) => {
+    let items = [...mockAuditLogs];
+    if (action) items = items.filter((r) => r.action === action);
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter((r) =>
+        `${r.actor_username} ${r.action} ${r.resource_type || ''} ${r.resource_name || ''}`.toLowerCase().includes(q)
+      );
+    }
+    return { items: items.slice(offset, offset + limit), total: items.length };
+  },
+  getAuditRetention: async () => ({ retention_days: mockAuditRetentionDays }),
+  updateAuditRetention: async (days) => {
+    mockAuditRetentionDays = Number(days);
+    recordDemoAudit('audit_retention.update', 'audit_settings', null, { retention_days: mockAuditRetentionDays });
+    return { retention_days: mockAuditRetentionDays };
+  },
+  getAuditExportUrl: () => '#demo-export',
 };

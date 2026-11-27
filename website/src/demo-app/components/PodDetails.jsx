@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, RefreshCw, Terminal, Search, CheckCircle, EyeOff, RotateCcw, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
+import { FileText, RefreshCw, Terminal, Clock, Trash2, FlaskConical, Sparkles, Loader2 } from 'lucide-react';
 import SolutionMarkdown from './SolutionMarkdown';
 import TroubleshootSection from './TroubleshootSection';
 import { api } from '../services/api';
@@ -64,7 +64,7 @@ const MirrorPodStatus = ({ mirror, onDelete, onRefresh, isDark = false }) => {
   const phase = mirror.phase || 'Pending';
 
   return (
-    <div className={`border-2 rounded-lg p-4 ${isDark ? 'border-blue-700 bg-blue-900/30' : 'border-blue-300 bg-blue-50'}`}>
+    <div className={`border-2 rounded-sm p-4 ${isDark ? 'border-blue-700 bg-blue-900/30' : 'border-blue-300 bg-blue-50'}`}>
       <div className="flex items-center mb-3">
         <FlaskConical className={`w-4 h-4 mr-2 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
         <h4 className={`text-sm font-semibold ${isDark ? 'text-blue-200' : 'text-blue-900'}`}>Mirror Pod Active</h4>
@@ -91,7 +91,7 @@ const MirrorPodStatus = ({ mirror, onDelete, onRefresh, isDark = false }) => {
         <button
           onClick={handleDelete}
           disabled={isDeleting}
-          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
+          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-sm disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
         >
           <Trash2 className="w-3.5 h-3.5 mr-1" />
           {isDeleting ? 'Deleting...' : 'Delete Mirror'}
@@ -101,12 +101,36 @@ const MirrorPodStatus = ({ mirror, onDelete, onRefresh, isDark = false }) => {
   );
 };
 
-const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpdated, onLogAwareSolutionUpdated, onStatusChange, onDeleteRecord, isDark = false, aiEnabled = false, viewMode = 'active', activeMirror, onDeleteMirror, onRefreshMirror, canWrite = true }) => {
+const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpdated, onLogAwareSolutionUpdated, isDark = false, aiEnabled = false, activeMirror, onDeleteMirror, onRefreshMirror, canWrite = true }) => {
   const [isRetrying, setIsRetrying] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
+  const [availableLLMs, setAvailableLLMs] = useState([]);
+  const [selectedLLMId, setSelectedLLMId] = useState('');
   const hasAutoTriggered = useRef(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadLLMs = async () => {
+      try {
+        const list = await api.getAvailableLLMs();
+        if (isMounted && Array.isArray(list) && list.length > 0) {
+          setAvailableLLMs(list);
+          const defaultLLM = list.find((m) => m.is_default);
+          if (defaultLLM) {
+            setSelectedLLMId(String(defaultLLM.id));
+          } else {
+            setSelectedLLMId(String(list[0].id));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load available LLMs:', err);
+      }
+    };
+    if (aiEnabled) {
+      loadLLMs();
+    }
+    return () => { isMounted = false; };
+  }, [aiEnabled]);
 
   const isGenerating = pod.solution === '__GENERATING__' || isRetrying;
 
@@ -134,10 +158,13 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
     pod.solution.includes('Basic troubleshooting')
   );
 
-  const handleRetrySolution = async () => {
+  const handleRetrySolution = async (targetLLMId = null) => {
     setIsRetrying(true);
     try {
-      const updatedPod = await api.retrySolution(pod.id);
+      const llmToUse = targetLLMId !== null ? targetLLMId : (selectedLLMId ? parseInt(selectedLLMId, 10) : null);
+      const updatedPod = llmToUse !== null
+        ? await api.retrySolution(pod.id, llmToUse)
+        : await api.retrySolution(pod.id);
       if (onSolutionUpdated) {
         onSolutionUpdated(updatedPod);
       }
@@ -155,26 +182,6 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
       handleRetrySolution();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleStatusAction = async (newStatus) => {
-    if (!onStatusChange) return;
-    setIsUpdatingStatus(true);
-    try {
-      await onStatusChange(pod.id, newStatus);
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!onDeleteRecord) return;
-    setIsDeleting(true);
-    try {
-      await onDeleteRecord(pod.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const formatTimestamp = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
@@ -315,72 +322,6 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
         </div>
       )}
 
-      {/* Workflow Actions */}
-      {onStatusChange && (
-        <div className="flex items-center flex-wrap gap-2">
-          {/* New status: Acknowledge + Ignore */}
-          {(pod.status === 'new' || !pod.status) && (
-            <></>
-          )}
-
-          {/* Investigating status: Ignore only (resolve is automatic) */}
-          {pod.status === 'investigating' && (
-            <>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${isDark ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-300'}`}>
-                <Clock className="w-3 h-3 mr-1" />
-                Investigating — will auto-resolve when pod recovers
-              </span>
-            </>
-          )}
-
-          {/* Resolved status: show resolution info + delete */}
-          {pod.status === 'resolved' && (
-            <div className={`flex items-center text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium mr-2 border ${isDark ? 'bg-green-900/50 text-green-300 border-green-700' : 'bg-green-100 text-green-800 border-green-300'}`}>
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Resolved
-              </span>
-              {pod.resolved_at && <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>on {new Date(pod.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
-              {pod.resolution_note && <span className={`ml-2 italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>— {pod.resolution_note}</span>}
-              {onDeleteRecord && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`ml-auto shrink-0 inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Ignored status: Restore + Delete buttons */}
-          {pod.status === 'ignored' && (
-            <>
-              <button
-                onClick={() => handleStatusAction('new')}
-                disabled={isUpdatingStatus}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md disabled:opacity-50 ${isDark ? 'text-blue-300 bg-blue-900/40 border border-blue-700 hover:bg-blue-900/60' : 'text-blue-700 bg-blue-100 border border-blue-300 hover:bg-blue-200'}`}
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                Restore
-              </button>
-              {onDeleteRecord && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md disabled:opacity-50 ${isDark ? 'text-red-300 bg-red-900/40 border border-red-700 hover:bg-red-900/60' : 'text-red-700 bg-red-50 border border-red-300 hover:bg-red-100'}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
       {/* Mirror Pod Status */}
       {activeMirror && (
         <MirrorPodStatus
@@ -411,9 +352,28 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <h4 className={`font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>AI-Generated Solution</h4>
+            {availableLLMs.length > 1 && (
+              <select
+                value={selectedLLMId}
+                onChange={(e) => setSelectedLLMId(e.target.value)}
+                disabled={isRetrying}
+                className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark
+                    ? 'bg-gray-800 border-gray-700 text-gray-200'
+                    : 'bg-white border-gray-300 text-gray-700'
+                }`}
+                title="Select LLM model"
+              >
+                {availableLLMs.map((item) => (
+                  <option key={item.id} value={String(item.id)}>
+                    {item.name} {item.is_default ? '(Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
             {hasQuickSolution && canWrite && (
               <button
-                onClick={handleRetrySolution}
+                onClick={() => handleRetrySolution()}
                 disabled={isRetrying || !aiEnabled}
                 className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'text-blue-300 bg-blue-900/40 border border-blue-700 hover:bg-blue-900/60' : 'text-blue-700 bg-blue-100 border border-blue-300 hover:bg-blue-200'}`}
                 title={!aiEnabled ? 'AI provider not configured' : 'Retry AI Solution'}
@@ -427,7 +387,7 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
             {aiEnabled && onTestFix && (
               <button
                 onClick={onTestFix}
-                className={`inline-flex items-center px-3 py-1 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'border border-blue-700 text-blue-300 bg-blue-900/40 hover:bg-blue-900/60' : 'border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100'}`}
+                className={`inline-flex items-center px-3 py-1 rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'border border-blue-700 text-blue-300 bg-blue-900/40 hover:bg-blue-900/60' : 'border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100'}`}
                 title="Deploy a temporary mirror pod with the AI fix applied"
               >
                 <FlaskConical className="w-4 h-4 mr-2" />
@@ -436,7 +396,7 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
             )}
             <button
               onClick={onViewLogs}
-              className={`inline-flex items-center px-3 py-1 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${isDark ? 'border border-green-700 text-green-300 bg-green-900/40 hover:bg-green-900/60' : 'border border-green-300 text-green-700 bg-green-50 hover:bg-green-100'}`}
+              className={`inline-flex items-center px-3 py-1 rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${isDark ? 'border border-green-700 text-green-300 bg-green-900/40 hover:bg-green-900/60' : 'border border-green-300 text-green-700 bg-green-50 hover:bg-green-100'}`}
               title="View Pod Logs"
             >
               <Terminal className="w-4 h-4 mr-2" />
@@ -444,7 +404,7 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
             </button>
             <button
               onClick={onViewManifest}
-              className={`inline-flex items-center px-3 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`inline-flex items-center px-3 py-1 border rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 isDark
                   ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600'
                   : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
@@ -486,7 +446,7 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
                 Generate a quick AI-based solution for this failure.
               </p>
               <button
-                onClick={handleRetrySolution}
+                onClick={() => handleRetrySolution()}
                 disabled={isRetrying || !aiEnabled}
                 className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'text-blue-300 bg-blue-900/40 border border-blue-700 hover:bg-blue-900/60' : 'text-blue-700 bg-blue-100 border border-blue-300 hover:bg-blue-200'}`}
                 title={!aiEnabled ? 'AI provider not configured' : 'Generate a quick AI solution'}
@@ -507,6 +467,9 @@ const PodDetails = ({ pod, onViewManifest, onViewLogs, onTestFix, onSolutionUpda
         aiEnabled={aiEnabled}
         onLogAwareSolutionUpdated={onLogAwareSolutionUpdated}
         canWrite={canWrite}
+        selectedLLMId={selectedLLMId}
+        availableLLMs={availableLLMs}
+        onLLMChange={(id) => setSelectedLLMId(id)}
       />
     );
 

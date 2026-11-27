@@ -3,22 +3,31 @@ import ReactFlow, {
   Background,
   Controls,
   MarkerType,
+  MiniMap,
   Panel,
   ReactFlowProvider,
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import { nodeTypes } from './nodeTypes';
 import ManifestModal from '../ManifestModal';
 import RbacSummaryModal from './RbacSummaryModal';
 import { api } from '../../services/api';
 
 const SYNTHESIZED_KINDS = new Set(['Permission', 'Subject:User', 'Subject:Group']);
+const SUPPORTING_KINDS = new Set([
+  'ReplicaSet',
+  'ConfigMap',
+  'Secret',
+  'Endpoints',
+  'EndpointSlice',
+  'ServiceAccount',
+]);
 
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 70;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 76;
 
 const EDGE_STYLE = {
   owns: {
@@ -86,10 +95,17 @@ const EDGE_STYLE = {
   },
 };
 
-const layoutWithDagre = (rfNodes, rfEdges) => {
+const layoutWithDagre = (rfNodes, rfEdges, direction = 'LR') => {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60, marginx: 20, marginy: 20 });
+  const isLR = direction === 'LR';
+  g.setGraph({
+    rankdir: direction,
+    nodesep: isLR ? 44 : 55,
+    ranksep: isLR ? 95 : 80,
+    marginx: 32,
+    marginy: 32,
+  });
 
   rfNodes.forEach((node) => {
     g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -110,7 +126,7 @@ const layoutWithDagre = (rfNodes, rfEdges) => {
   });
 };
 
-const buildGraphElements = (response, isDark, collapsedGroups) => {
+const buildGraphElements = (response, isDark, collapsedGroups, direction = 'LR', coreOnly = false) => {
   if (!response) return { nodes: [], edges: [] };
 
   const groups = response.groups || [];
@@ -124,7 +140,10 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
     }
   });
 
-  const visibleNodes = (response.nodes || []).filter((n) => !collapsedNodeIds.has(n.id));
+  const visibleNodes = (response.nodes || []).filter(
+    (n) => !collapsedNodeIds.has(n.id) && (!coreOnly || !SUPPORTING_KINDS.has(n.kind))
+  );
+  const visibleNodeIdSet = new Set(visibleNodes.map((n) => n.id));
 
   const rfNodes = visibleNodes.map((n) => ({
     id: n.id,
@@ -137,13 +156,16 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
       status: n.status,
       metadata: n.metadata || {},
       isDark,
+      direction,
       raw: n,
     },
   }));
 
   groupByCollapsedId.forEach((g) => {
+    const cid = `__collapsed__${g.id}`;
+    visibleNodeIdSet.add(cid);
     rfNodes.push({
-      id: `__collapsed__${g.id}`,
+      id: cid,
       type: 'collapsedGroup',
       position: { x: 0, y: 0 },
       data: {
@@ -151,6 +173,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
         label: g.label,
         count: g.node_ids.length,
         isDark,
+        direction,
       },
     });
   });
@@ -169,6 +192,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
     const src = remap(e.source);
     const tgt = remap(e.target);
     if (src === tgt) return;
+    if (!visibleNodeIdSet.has(src) || !visibleNodeIdSet.has(tgt)) return;
     const style = EDGE_STYLE[e.type] || EDGE_STYLE.owns;
     const key = `${src}|${tgt}|${e.type}`;
     if (edgeSet.has(key)) return;
@@ -177,7 +201,8 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
       id: `e-${idx}-${src}-${tgt}-${e.type}`,
       source: src,
       target: tgt,
-      type: 'default',
+      type: 'smoothstep',
+      pathOptions: { borderRadius: 12 },
       animated: style.animated,
       style: {
         stroke: style.stroke,
@@ -189,7 +214,7 @@ const buildGraphElements = (response, isDark, collapsedGroups) => {
     });
   });
 
-  return { nodes: layoutWithDagre(rfNodes, rfEdges), edges: rfEdges };
+  return { nodes: layoutWithDagre(rfNodes, rfEdges, direction), edges: rfEdges };
 };
 
 const Legend = ({ isDark, groups, collapsedGroups, onToggleGroup }) => {
@@ -206,7 +231,7 @@ const Legend = ({ isDark, groups, collapsedGroups, onToggleGroup }) => {
   ];
   return (
     <div
-      className={`text-xs rounded-md border shadow-sm px-3 py-2 ${
+      className={`text-xs rounded-sm border shadow-sm px-3 py-2 ${
         isDark ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-white border-gray-200 text-gray-700'
       }`}
     >
@@ -312,8 +337,31 @@ const computeFocusedSet = (focusedEdgeId, nodes, edges) => {
 };
 
 const Inner = ({ data, isDark }) => {
-  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const [direction, setDirection] = useState('LR');
+  const [coreOnly, setCoreOnly] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedNodeId, setHighlightedNodeId] = useState(null);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    const groups = data?.groups || [];
+    const nodeCount = data?.nodes?.length || 0;
+    if (nodeCount > 14 && groups.length > 0) {
+      return new Set(groups.map((g) => g.id));
+    }
+    return new Set();
+  });
   const [focusedEdgeId, setFocusedEdgeId] = useState(null);
+
+  // Auto-collapse groups when switching to a large namespace (>14 nodes)
+  useEffect(() => {
+    const groups = data?.groups || [];
+    const nodeCount = data?.nodes?.length || 0;
+    if (nodeCount > 14 && groups.length > 0) {
+      setCollapsedGroups(new Set(groups.map((g) => g.id)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  }, [data]);
   const [modalState, setModalState] = useState({
     isOpen: false,
     namespace: '',
@@ -330,11 +378,41 @@ const Inner = ({ data, isDark }) => {
     namespace: '',
     metadata: null,
   });
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
 
   const { nodes: baseNodes, edges: baseEdges } = useMemo(
-    () => buildGraphElements(data, isDark, collapsedGroups),
-    [data, isDark, collapsedGroups]
+    () => buildGraphElements(data, isDark, collapsedGroups, direction, coreOnly),
+    [data, isDark, collapsedGroups, direction, coreOnly]
+  );
+
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return baseNodes
+      .filter((n) => {
+        const name = (n.data?.name || n.data?.label || '').toLowerCase();
+        const kind = (n.data?.kind || '').toLowerCase();
+        return name.includes(q) || kind.includes(q);
+      })
+      .slice(0, 8);
+  }, [baseNodes, searchQuery]);
+
+  const handleJumpToNode = useCallback(
+    (node) => {
+      if (!node?.position) return;
+      setHighlightedNodeId(node.id);
+      setSearchQuery('');
+      try {
+        setCenter(
+          node.position.x + NODE_WIDTH / 2,
+          node.position.y + NODE_HEIGHT / 2,
+          { zoom: 1.15, duration: 350 }
+        );
+      } catch {
+        // ignore in test environments where setCenter may not be mocked
+      }
+    },
+    [setCenter]
   );
 
   // Clear focus if the focused edge no longer exists after data/collapse refresh.
@@ -350,14 +428,28 @@ const Inner = ({ data, isDark }) => {
   );
 
   const nodes = useMemo(() => {
-    if (!focusedNodeIds) return baseNodes;
+    if (!focusedNodeIds && !highlightedNodeId) return baseNodes;
     return baseNodes.map((n) => {
-      if (focusedNodeIds.has(n.id)) {
-        return { ...n, style: { ...(n.style || {}), opacity: 1 }, zIndex: 1 };
+      if (focusedNodeIds) {
+        if (focusedNodeIds.has(n.id)) {
+          return { ...n, style: { ...(n.style || {}), opacity: 1 }, zIndex: 1 };
+        }
+        return { ...n, style: { ...(n.style || {}), opacity: 0.15 }, zIndex: 0 };
       }
-      return { ...n, style: { ...(n.style || {}), opacity: 0.15 }, zIndex: 0 };
+      if (highlightedNodeId && n.id === highlightedNodeId) {
+        return {
+          ...n,
+          style: {
+            ...(n.style || {}),
+            boxShadow: '0 0 0 3px #3b82f6',
+            borderRadius: '12px',
+          },
+          zIndex: 2,
+        };
+      }
+      return n;
     });
-  }, [baseNodes, focusedNodeIds]);
+  }, [baseNodes, focusedNodeIds, highlightedNodeId]);
 
   const edges = useMemo(() => {
     if (!focusedEdgeIds) return baseEdges;
@@ -466,6 +558,7 @@ const Inner = ({ data, isDark }) => {
 
   const handlePaneClick = useCallback(() => {
     setFocusedEdgeId(null);
+    setHighlightedNodeId(null);
   }, []);
 
   const groups = data?.groups || [];
@@ -485,16 +578,157 @@ const Inner = ({ data, isDark }) => {
         minZoom={0.1}
         maxZoom={2}
       >
-        <Background color={isDark ? '#374151' : '#e5e7eb'} gap={16} />
+        <Background color={isDark ? '#1e293b' : '#cbd5e1'} gap={20} size={1.2} />
         <Controls showInteractive={false} />
-        <Panel position="top-right">
-          <Legend
-            isDark={isDark}
-            groups={groups}
-            collapsedGroups={collapsedGroups}
-            onToggleGroup={handleToggleGroup}
+        {typeof MiniMap === 'function' && (
+          <MiniMap
+            pannable
+            zoomable
+            nodeColor={isDark ? '#334155' : '#cbd5e1'}
+            maskColor={isDark ? 'rgba(15, 23, 42, 0.7)' : 'rgba(241, 245, 249, 0.7)'}
+            style={{
+              backgroundColor: isDark ? '#0f172a' : '#ffffff',
+              border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+              borderRadius: '8px',
+            }}
           />
+        )}
+        <Panel position="top-left">
+          <div className="flex flex-col gap-1.5">
+            <div
+              className={`flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-lg border shadow-sm text-xs ${
+                isDark
+                  ? 'bg-slate-900/90 border-slate-700 text-slate-200'
+                  : 'bg-white/95 border-slate-200 text-slate-700'
+              }`}
+            >
+              {/* Quick Search / Jump-to-Node */}
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 absolute left-2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Find node..."
+                  data-testid="diagram-node-search"
+                  className={`pl-7 pr-6 py-1 w-36 rounded border text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    isDark
+                      ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder-slate-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-1.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+
+              <button
+                type="button"
+                onClick={() => setDirection((d) => (d === 'LR' ? 'TB' : 'LR'))}
+                className={`px-2 py-1 rounded font-medium transition-colors ${
+                  isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                }`}
+                title="Switch layout orientation"
+              >
+                {direction === 'LR' ? 'Horizontal' : 'Vertical'}
+              </button>
+
+              <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+
+              <button
+                type="button"
+                onClick={() => setCoreOnly((v) => !v)}
+                data-testid="diagram-core-filter-btn"
+                className={`px-2 py-1 rounded font-medium transition-colors ${
+                  coreOnly
+                    ? isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
+                    : isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                }`}
+                title="Hide supporting resources (ConfigMaps, Secrets, ReplicaSets, Endpoints, ServiceAccounts)"
+              >
+                {coreOnly ? 'Core Only' : 'All Resources'}
+              </button>
+
+              {groups.length > 0 && (
+                <>
+                  <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (collapsedGroups.size === groups.length) {
+                        setCollapsedGroups(new Set());
+                      } else {
+                        setCollapsedGroups(new Set(groups.map((g) => g.id)));
+                      }
+                    }}
+                    className={`px-2 py-1 rounded font-medium transition-colors ${
+                      isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    {collapsedGroups.size === groups.length ? 'Expand All' : 'Collapse All'}
+                  </button>
+                </>
+              )}
+              <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
+              <button
+                type="button"
+                onClick={() => setShowLegend((v) => !v)}
+                className={`px-2 py-1 rounded font-medium transition-colors ${
+                  showLegend
+                    ? isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
+                    : isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                }`}
+              >
+                Legend
+              </button>
+            </div>
+
+            {/* Search Results Dropdown */}
+            {searchMatches.length > 0 && (
+              <div
+                className={`w-64 rounded-lg border shadow-lg overflow-hidden text-xs ${
+                  isDark
+                    ? 'bg-slate-900 border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              >
+                {searchMatches.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => handleJumpToNode(m)}
+                    className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 transition-colors ${
+                      isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="font-medium truncate">{m.data?.name || m.data?.label}</span>
+                    <span className={`text-[10px] uppercase flex-shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {m.data?.kind || 'Group'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </Panel>
+        {showLegend && (
+          <Panel position="top-right">
+            <Legend
+              isDark={isDark}
+              groups={groups}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={handleToggleGroup}
+            />
+          </Panel>
+        )}
       </ReactFlow>
       <ManifestModal
         isOpen={modalState.isOpen}
@@ -525,7 +759,7 @@ const Inner = ({ data, isDark }) => {
 
 const TopologyGraph = ({ data, isDark = false }) => {
   return (
-    <div className={`w-full h-full ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
+    <div className={`w-full h-full ${isDark ? 'bg-slate-950' : 'bg-slate-50/70'}`}>
       <ReactFlowProvider>
         <Inner data={data} isDark={isDark} />
       </ReactFlowProvider>

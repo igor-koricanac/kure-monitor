@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, Clock, EyeOff, RefreshCw, LogOut, Network, Lightbulb } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Server, Shield, Activity, ChevronDown, Filter, Settings, Sun, Moon, Download, RefreshCw, LogOut, Network, Lightbulb, Users } from 'lucide-react';
 import PodTable from './PodTable';
 import SecurityTable from './SecurityTable';
 import AdminPanel from './AdminPanel';
 import SetupBanner from './SetupBanner';
 import DiagramTab from './Diagram/DiagramTab';
 import AdvicePanel from './AdvicePanel';
+import LivePodsTable from './LivePodsTable';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -15,7 +16,20 @@ import logo from '../kure_monitor_logo.svg';
 const Dashboard = () => {
   const { user, userRole, logout } = useAuth();
   const navigate = useNavigate();
-  const canWrite = userRole === 'admin' || userRole === 'member';
+  const isAdmin = userRole === 'admin';
+  const canWrite = isAdmin || user?.effective_access_level === 'write';
+  const hasTeam = isAdmin || Boolean(user?.has_team);
+  const allowedTabs = useMemo(() => {
+    return user?.effective_tabs || (isAdmin ? ['pod_monitoring', 'security_scanner', 'diagram', 'ai_advice', 'admin'] : []);
+  }, [user?.effective_tabs, isAdmin]);
+
+  const isNamespaceAllowed = useCallback((ns) => {
+    if (!ns) return true;
+    if (isAdmin || user?.all_namespaces) return true;
+    if (!Array.isArray(user?.effective_namespaces)) return true;
+    return user.effective_namespaces.includes(ns);
+  }, [isAdmin, user?.all_namespaces, user?.effective_namespaces]);
+
   const [activeTab, setActiveTab] = useState('monitoring');
   const [pods, setPods] = useState([]);
   const [securityFindings, setSecurityFindings] = useState([]);
@@ -32,7 +46,10 @@ const Dashboard = () => {
   });
   // Separate namespace filters for each tab
   const [podNamespaceFilter, setPodNamespaceFilter] = useState('');
-  const [securityNamespaceFilter, setSecurityNamespaceFilter] = useState('');
+  const [selectedSecurityNamespaces, setSelectedSecurityNamespaces] = useState([]);
+  const [showSecurityNamespaceDropdown, setShowSecurityNamespaceDropdown] = useState(false);
+  const [securityNamespaceSearchQuery, setSecurityNamespaceSearchQuery] = useState('');
+  const [availableClusterNamespaces, setAvailableClusterNamespaces] = useState([]);
   const [selectedSeverities, setSelectedSeverities] = useState(['critical', 'high', 'medium', 'low']);
   const [showSeverityDropdown, setShowSeverityDropdown] = useState(false);
   const [selectedRules, setSelectedRules] = useState([]);
@@ -41,12 +58,12 @@ const Dashboard = () => {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   // Pod sub-tab state
   const [podSubTab, setPodSubTab] = useState('active');
-  const [podHistory, setPodHistory] = useState([]);
-  const [ignoredPods, setIgnoredPods] = useState([]);
   // Advice WS event forwarding — each new advice_* WS message increments
   // `seq` so AdvicePanel can react via useEffect even when payloads repeat.
   const [adviceEvent, setAdviceEvent] = useState(null);
   const adviceSeqRef = useRef(0);
+  const [auditEvent, setAuditEvent] = useState(null);
+  const auditSeqRef = useRef(0);
   // Security scan rescan notification
   const [securityScanUpdating, setSecurityScanUpdating] = useState(false);
   const securityScanTimeoutRef = useRef(null);
@@ -55,6 +72,7 @@ const Dashboard = () => {
   // Refs for dropdown click-outside handling
   const severityDropdownRef = useRef(null);
   const ruleDropdownRef = useRef(null);
+  const securityNamespaceDropdownRef = useRef(null);
   const exportDropdownRef = useRef(null);
 
   // Helper to show banner and reset hide timer (during active rescans)
@@ -109,6 +127,10 @@ const Dashboard = () => {
         setShowRuleDropdown(false);
         setRuleSearchQuery('');
       }
+      if (securityNamespaceDropdownRef.current && !securityNamespaceDropdownRef.current.contains(event.target)) {
+        setShowSecurityNamespaceDropdown(false);
+        setSecurityNamespaceSearchQuery('');
+      }
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
         setShowExportDropdown(false);
       }
@@ -126,6 +148,7 @@ const Dashboard = () => {
   // Handle WebSocket messages - wrapped in useCallback for stability
   const handleWebSocketMessage = useCallback((message) => {
     if (message.type === 'pod_failure') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Update or add pod failure (deduplicate by id OR by pod_name+namespace)
       setPods(prevPods => {
         // Check by ID first (most reliable), then by name+namespace
@@ -158,6 +181,7 @@ const Dashboard = () => {
         )
       );
     } else if (message.type === 'security_finding') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Show banner when findings are being added/updated (rescan in progress)
       showSecurityBanner();
       // Update or add security finding (deduplicate by id OR by resource_name+namespace+title)
@@ -184,6 +208,7 @@ const Dashboard = () => {
         }
       });
     } else if (message.type === 'security_finding_deleted') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Show banner when findings are being deleted (rescan in progress)
       showSecurityBanner();
       // Remove deleted security finding from list
@@ -218,6 +243,8 @@ const Dashboard = () => {
       message.type === 'advice_finding_deleted' ||
       message.type === 'advice_scan_status'
     ) {
+      const eventNs = message.data?.namespace || message.data?.scope?.namespace;
+      if (eventNs && !isNamespaceAllowed(eventNs)) return;
       // Forward to AdvicePanel via a bumped sequence number so the panel's
       // useEffect re-runs on every message even if the payload repeats.
       adviceSeqRef.current += 1;
@@ -226,7 +253,14 @@ const Dashboard = () => {
         type: message.type,
         data: message.data,
       });
+    } else if (message.type === 'audit_log') {
+      auditSeqRef.current += 1;
+      setAuditEvent({
+        seq: auditSeqRef.current,
+        data: message.data,
+      });
     } else if (message.type === 'pod_solution_updated') {
+      if (!isNamespaceAllowed(message.data?.namespace)) return;
       // Update pod with new solution
       setPods(prevPods => {
         return prevPods.map(pod =>
@@ -234,28 +268,17 @@ const Dashboard = () => {
         );
       });
     } else if (message.type === 'pod_status_change') {
-      // Move pod between lists based on new status
       const pod = message.data;
+      if (!isNamespaceAllowed(pod?.namespace)) return;
       const newStatus = pod.status;
-      // Remove from all lists first
+      // Remove from active list
       setPods(prev => prev.filter(p => p.id !== pod.id));
-      setPodHistory(prev => prev.filter(p => p.id !== pod.id));
-      setIgnoredPods(prev => prev.filter(p => p.id !== pod.id));
-      // Add to appropriate list
+      // Re-add if still active (new or investigating)
       if (newStatus === 'new' || newStatus === 'investigating') {
         setPods(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
-      } else if (newStatus === 'resolved') {
-        setPodHistory(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
-      } else if (newStatus === 'ignored') {
-        setIgnoredPods(prev => [pod, ...prev.filter(p => p.id !== pod.id)]);
       }
-    } else if (message.type === 'pod_record_deleted') {
-      // Remove permanently deleted pod record from all lists
-      const deletedId = message.data.id;
-      setPodHistory(prev => prev.filter(p => p.id !== deletedId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== deletedId));
     }
-  }, [showSecurityBanner]);
+  }, [showSecurityBanner, isNamespaceAllowed]);
 
   // Handle solution update from retry button
   const handleSolutionUpdated = (updatedPod) => {
@@ -274,65 +297,7 @@ const Dashboard = () => {
         : pod
     );
     setPods(applyUpdate);
-    setPodHistory(applyUpdate);
-    setIgnoredPods(applyUpdate);
   };
-
-  // Handle permanent deletion of a pod record (history/ignored)
-  const handleDeletePodRecord = async (podId) => {
-    try {
-      await api.deletePodRecord(podId);
-      setPodHistory(prev => prev.filter(p => p.id !== podId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== podId));
-    } catch (err) {
-      console.error('Failed to delete pod record:', err);
-    }
-  };
-
-  // Handle pod status change (acknowledge, resolve, ignore, restore)
-  const handleStatusChange = async (podId, newStatus) => {
-    try {
-      const updatedPod = await api.updatePodStatus(podId, newStatus);
-      // Remove from current list
-      setPods(prev => prev.filter(p => p.id !== podId));
-      setPodHistory(prev => prev.filter(p => p.id !== podId));
-      setIgnoredPods(prev => prev.filter(p => p.id !== podId));
-      // Add to appropriate list
-      if (newStatus === 'new' || newStatus === 'investigating') {
-        setPods(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      } else if (newStatus === 'resolved') {
-        setPodHistory(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      } else if (newStatus === 'ignored') {
-        setIgnoredPods(prev => [updatedPod, ...prev.filter(p => p.id !== updatedPod.id)]);
-      }
-    } catch (err) {
-      console.error('Failed to update pod status:', err);
-    }
-  };
-
-  // Load history/ignored pods on sub-tab change
-  const loadPodHistory = useCallback(async () => {
-    try {
-      const history = await api.getPodHistory();
-      setPodHistory(history);
-    } catch (err) {
-      console.error('Failed to load pod history:', err);
-    }
-  }, []);
-
-  const loadIgnoredPods = useCallback(async () => {
-    try {
-      const ignored = await api.getIgnoredPods();
-      setIgnoredPods(ignored);
-    } catch (err) {
-      console.error('Failed to load ignored pods:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (podSubTab === 'history') loadPodHistory();
-    else if (podSubTab === 'ignored') loadIgnoredPods();
-  }, [podSubTab, loadPodHistory, loadIgnoredPods]);
 
   const { connected } = useWebSocket(handleWebSocketMessage);
 
@@ -340,14 +305,6 @@ const Dashboard = () => {
   const filteredPods = podNamespaceFilter.trim() === ''
     ? pods
     : pods.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
-
-  const filteredHistory = podNamespaceFilter.trim() === ''
-    ? podHistory
-    : podHistory.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
-
-  const filteredIgnored = podNamespaceFilter.trim() === ''
-    ? ignoredPods
-    : ignoredPods.filter(pod => pod.namespace.toLowerCase().includes(podNamespaceFilter.toLowerCase().trim()));
 
   // Severity order for sorting (Critical > High > Medium > Low)
   const severityOrder = { 'critical': 1, 'high': 2, 'medium': 3, 'low': 4 };
@@ -369,6 +326,23 @@ const Dashboard = () => {
     [securityFindings]
   );
 
+  // Extract all available namespaces the user has access to for the Security Scan namespace dropdown
+  const allSecurityNamespaces = useMemo(() => {
+    const nsSet = new Set();
+    securityFindings.forEach(f => {
+      if (f.namespace && isNamespaceAllowed(f.namespace)) nsSet.add(f.namespace);
+    });
+    availableClusterNamespaces.forEach(ns => {
+      if (ns && isNamespaceAllowed(ns)) nsSet.add(ns);
+    });
+    if (Array.isArray(user?.effective_namespaces)) {
+      user.effective_namespaces.forEach(ns => {
+        if (ns && ns !== '*') nsSet.add(ns);
+      });
+    }
+    return [...nsSet].sort();
+  }, [securityFindings, availableClusterNamespaces, user?.effective_namespaces, isNamespaceAllowed]);
+
   // Clean up stale rule selections when available rules change
   useEffect(() => {
     if (selectedRules.length > 0) {
@@ -379,10 +353,20 @@ const Dashboard = () => {
     }
   }, [allRuleTitles]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clean up stale namespace selections when available namespaces change
+  useEffect(() => {
+    if (selectedSecurityNamespaces.length > 0 && allSecurityNamespaces.length > 0) {
+      const validNs = selectedSecurityNamespaces.filter(ns => allSecurityNamespaces.includes(ns));
+      if (validNs.length !== selectedSecurityNamespaces.length) {
+        setSelectedSecurityNamespaces(validNs);
+      }
+    }
+  }, [allSecurityNamespaces]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Filter security findings based on security-specific namespace filter, severity, and rule
   const filteredSecurityFindings = securityFindings.filter(finding => {
-    const matchesNamespace = securityNamespaceFilter.trim() === '' ||
-      finding.namespace.toLowerCase().includes(securityNamespaceFilter.toLowerCase().trim());
+    const matchesNamespace = selectedSecurityNamespaces.length === 0 ||
+      selectedSecurityNamespaces.includes(finding.namespace);
     const matchesSeverity = selectedSeverities.includes(finding.severity.toLowerCase());
     const matchesRule = selectedRules.length === 0 || selectedRules.includes(getRuleCategory(finding.title));
     return matchesNamespace && matchesSeverity && matchesRule;
@@ -423,6 +407,17 @@ const Dashboard = () => {
     });
   };
 
+  // Toggle security namespace selection
+  const toggleSecurityNamespace = (ns) => {
+    setSelectedSecurityNamespaces(prev => {
+      if (prev.includes(ns)) {
+        return prev.filter(n => n !== ns);
+      } else {
+        return [...prev, ns];
+      }
+    });
+  };
+
   // Get severity badge color
   const getSeverityBadgeColor = (severity) => {
     switch (severity) {
@@ -442,25 +437,26 @@ const Dashboard = () => {
       try {
         if (cancelled) return;
         setLoading(true);
-        const [activePods, findings, config, history, ignored] = await Promise.all([
+        const [activePods, findings, config, diagNsRes] = await Promise.all([
           api.getFailedPods(),
           api.getSecurityFindings(),
           api.getConfig(),
-          api.getPodHistory().catch(() => []),
-          api.getIgnoredPods().catch(() => [])
+          typeof api.getDiagramNamespaces === 'function'
+            ? api.getDiagramNamespaces().catch(() => ({ namespaces: [] }))
+            : Promise.resolve({ namespaces: [] }),
         ]);
         if (cancelled) return;
-        setPods(activePods);
+        setPods(Array.isArray(activePods) ? activePods : []);
         if (cancelled) return;
-        setSecurityFindings(findings);
+        setSecurityFindings(Array.isArray(findings) ? findings : (findings?.findings || []));
         if (cancelled) return;
-        setAiEnabled(config.ai_enabled || false);
+        if (Array.isArray(diagNsRes?.namespaces)) {
+          setAvailableClusterNamespaces(diagNsRes.namespaces);
+        }
         if (cancelled) return;
-        if (config.features) setFeatures(prev => ({ ...prev, ...config.features }));
+        setAiEnabled(config?.ai_enabled || false);
         if (cancelled) return;
-        setPodHistory(history);
-        if (cancelled) return;
-        setIgnoredPods(ignored);
+        if (config?.features) setFeatures(prev => ({ ...prev, ...config.features }));
         if (cancelled) return;
         setError(null);
       } catch (err) {
@@ -473,12 +469,33 @@ const Dashboard = () => {
       }
     };
 
-    loadData();
+    if (hasTeam) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasTeam]);
+
+  // Adjust active tab if user's permissions don't allow the current tab
+  useEffect(() => {
+    if (!isAdmin && allowedTabs.length > 0) {
+      const tabMap = {
+        pod_monitoring: 'monitoring',
+        security_scanner: 'security',
+        diagram: 'diagram',
+        ai_advice: 'advice',
+      };
+      const allowedClientTabs = allowedTabs.map((t) => tabMap[t]).filter(Boolean);
+      if (allowedClientTabs.length > 0 && !allowedClientTabs.includes(activeTab)) {
+        setActiveTab(allowedClientTabs[0]);
+      }
+    }
+  }, [isAdmin, allowedTabs, activeTab]);
+
 
   // Trigger a full security rescan
   const handleSecurityRescan = useCallback(async () => {
@@ -547,7 +564,7 @@ const Dashboard = () => {
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 rounded-sm transition-colors ${
                   isDark
                     ? 'hover:bg-gray-700 text-gray-300 hover:text-gray-100'
                     : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
@@ -572,6 +589,18 @@ const Dashboard = () => {
                       {user.role}
                     </span>
                   </div>
+                  <button
+                    onClick={async () => { await logout(); navigate('/login'); }}
+                    className={`p-2 rounded-sm transition-colors ${
+                      isDark
+                        ? 'hover:bg-gray-700 text-gray-300 hover:text-gray-100'
+                        : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+                    }`}
+                    title="Sign out"
+                    aria-label="Sign out"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
                 </div>
               )}
 
@@ -589,7 +618,7 @@ const Dashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className={`mb-6 ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-50 border-red-200'} border rounded-md p-4`}>
+          <div className={`mb-6 ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-50 border-red-200'} border rounded-sm p-4`}>
             <div className="flex">
               <AlertTriangle className={`w-5 h-5 ${isDark ? 'text-red-400' : 'text-red-400'}`} />
               <div className="ml-3">
@@ -604,12 +633,27 @@ const Dashboard = () => {
           <SetupBanner isDark={isDark} onNavigateToAdmin={() => setActiveTab('admin')} />
         )}
 
+        {/* Empty state for non-admin users without a team */}
+        {!hasTeam ? (
+          <div className={`p-12 text-center rounded-sm border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+              <Users className={`w-8 h-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              No Team Assigned
+            </h3>
+            <p className={`text-sm max-w-md mx-auto ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              You are not currently assigned to any team. Contact an admin to get access.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Tabs */}
         <div className="mb-6">
           <div className={`border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
             <nav className="-mb-px flex justify-between">
               <div className="flex">
-                {features.pod_monitoring && (
+                {features.pod_monitoring && (isAdmin || allowedTabs.includes('pod_monitoring')) && (
                 <button
                   onClick={() => setActiveTab('monitoring')}
                   className={`${
@@ -627,7 +671,7 @@ const Dashboard = () => {
                   )}
                 </button>
                 )}
-                {features.security_scan && (
+                {features.security_scan && (isAdmin || allowedTabs.includes('security_scanner')) && (
                 <button
                   onClick={() => setActiveTab('security')}
                   className={`${
@@ -645,7 +689,7 @@ const Dashboard = () => {
                   )}
                 </button>
                 )}
-                {features.ai_advice && (
+                {features.ai_advice && (isAdmin || allowedTabs.includes('ai_advice')) && (
                 <button
                   onClick={() => setActiveTab('advice')}
                   className={`${
@@ -658,7 +702,7 @@ const Dashboard = () => {
                   <span>Advice</span>
                 </button>
                 )}
-                {features.diagram && (
+                {features.diagram && (isAdmin || allowedTabs.includes('diagram')) && (
                 <button
                   onClick={() => setActiveTab('diagram')}
                   className={`${
@@ -689,15 +733,15 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Filters - hide on admin, diagram, and advice tabs */}
-        {activeTab !== 'admin' && activeTab !== 'diagram' && activeTab !== 'advice' && (
+        {/* Filters - hide on admin, diagram, and advice tabs, or when on live pods subtab */}
+        {activeTab !== 'admin' && activeTab !== 'diagram' && activeTab !== 'advice' && !(activeTab === 'monitoring' && podSubTab === 'live') && (
         <div className="flex justify-end mb-4 gap-4">
           {/* Severity Filter - only show on security tab */}
           {activeTab === 'security' && (
             <div className="relative" ref={severityDropdownRef}>
               <button
                 onClick={() => setShowSeverityDropdown(!showSeverityDropdown)}
-                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDark
                     ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200'
                     : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
@@ -710,7 +754,7 @@ const Dashboard = () => {
               </button>
 
               {showSeverityDropdown && (
-                <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg border z-10 ${
+                <div className={`absolute right-0 mt-2 w-48 rounded-sm shadow-lg border z-10 ${
                   isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                 }`}>
                   <div className="py-1">
@@ -749,7 +793,7 @@ const Dashboard = () => {
             <div className="relative" ref={ruleDropdownRef}>
               <button
                 onClick={() => setShowRuleDropdown(!showRuleDropdown)}
-                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDark
                     ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200'
                     : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
@@ -764,7 +808,7 @@ const Dashboard = () => {
               </button>
 
               {showRuleDropdown && (
-                <div className={`absolute right-0 mt-2 w-72 rounded-md shadow-lg border z-10 ${
+                <div className={`absolute right-0 mt-2 w-72 rounded-sm shadow-lg border z-10 ${
                   isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                 }`}>
                   <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
@@ -824,7 +868,7 @@ const Dashboard = () => {
             <div className="relative" ref={exportDropdownRef}>
               <button
                 onClick={() => setShowExportDropdown(!showExportDropdown)}
-                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDark
                     ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200'
                     : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
@@ -836,7 +880,7 @@ const Dashboard = () => {
               </button>
 
               {showExportDropdown && (
-                <div className={`absolute right-0 mt-2 w-40 rounded-md shadow-lg border z-10 ${
+                <div className={`absolute right-0 mt-2 w-40 rounded-sm shadow-lg border z-10 ${
                   isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                 }`}>
                   <div className="py-1">
@@ -864,32 +908,111 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Namespace Filter - uses separate state per tab */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="namespace-filter" className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-              Filter by namespace:
-            </label>
-            <input
-              id="namespace-filter"
-              type="text"
-              value={activeTab === 'monitoring' ? podNamespaceFilter : securityNamespaceFilter}
-              onChange={(e) => activeTab === 'monitoring'
-                ? setPodNamespaceFilter(e.target.value)
-                : setSecurityNamespaceFilter(e.target.value)
-              }
-              placeholder="Enter namespace"
-              className={`block w-40 px-3 py-2 text-sm border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                isDark
-                  ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500'
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-              }`}
-            />
-          </div>
+          {/* Namespace Filter - searchable dropdown on Security Scan tab, text input on Pod Monitoring tab */}
+          {activeTab === 'security' ? (
+            <div className="relative" ref={securityNamespaceDropdownRef}>
+              <button
+                data-testid="security-namespace-dropdown-btn"
+                onClick={() => setShowSecurityNamespaceDropdown(!showSecurityNamespaceDropdown)}
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isDark
+                    ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200'
+                    : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <Server className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+                <span>Namespace</span>
+                {selectedSecurityNamespaces.length > 0 && (
+                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    ({selectedSecurityNamespaces.length}/{allSecurityNamespaces.length})
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 transition-transform ${isDark ? 'text-gray-400' : 'text-gray-500'} ${showSecurityNamespaceDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showSecurityNamespaceDropdown && (
+                <div className={`absolute right-0 mt-2 w-64 rounded-sm shadow-lg border z-10 ${
+                  isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                    <input
+                      type="text"
+                      placeholder="Search namespaces..."
+                      value={securityNamespaceSearchQuery}
+                      onChange={(e) => setSecurityNamespaceSearchQuery(e.target.value)}
+                      className={`w-full px-2 py-1.5 text-sm rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        isDark
+                          ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400'
+                          : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    {allSecurityNamespaces
+                      .filter(ns => ns.toLowerCase().includes(securityNamespaceSearchQuery.toLowerCase().trim()))
+                      .map(ns => (
+                        <label
+                          key={ns}
+                          className={`flex items-center px-4 py-2 cursor-pointer ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSecurityNamespaces.includes(ns)}
+                            onChange={() => toggleSecurityNamespace(ns)}
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
+                          />
+                          <span className={`ml-3 text-sm truncate ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                            {ns}
+                          </span>
+                        </label>
+                      ))}
+                    {allSecurityNamespaces.filter(ns => ns.toLowerCase().includes(securityNamespaceSearchQuery.toLowerCase().trim())).length === 0 && (
+                      <div className={`px-4 py-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        No matching namespaces
+                      </div>
+                    )}
+                  </div>
+                  <div className={`border-t px-4 py-2 flex justify-between ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                    <button
+                      onClick={() => setSelectedSecurityNamespaces([...allSecurityNamespaces])}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => setSelectedSecurityNamespaces([])}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <label htmlFor="namespace-filter" className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                Filter by namespace:
+              </label>
+              <input
+                id="namespace-filter"
+                type="text"
+                value={podNamespaceFilter}
+                onChange={(e) => setPodNamespaceFilter(e.target.value)}
+                placeholder="Enter namespace"
+                className={`block w-40 px-3 py-2 text-sm border rounded-sm shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                  isDark
+                    ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                }`}
+              />
+            </div>
+          )}
         </div>
         )}
 
         {/* Tab Content */}
-        <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} shadow rounded-lg`}>
+        <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} shadow rounded-sm`}>
           {activeTab === 'monitoring' && (
             <>
               {/* Pod sub-tabs */}
@@ -903,7 +1026,7 @@ const Dashboard = () => {
                   }`}
                 >
                   <Activity className="w-4 h-4" />
-                  <span>Active</span>
+                  <span>Failing pods</span>
                   {pods.length > 0 && (
                     <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800'}`}>
                       {pods.length}
@@ -911,36 +1034,15 @@ const Dashboard = () => {
                   )}
                 </button>
                 <button
-                  onClick={() => setPodSubTab('history')}
+                  onClick={() => setPodSubTab('live')}
                   className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
-                    podSubTab === 'history'
+                    podSubTab === 'live'
                       ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
                       : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <Clock className="w-4 h-4" />
-                  <span>History</span>
-                  {podHistory.length > 0 && (
-                    <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                      {podHistory.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setPodSubTab('ignored')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
-                    podSubTab === 'ignored'
-                      ? isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-600'
-                      : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <EyeOff className="w-4 h-4" />
-                  <span>Ignored</span>
-                  {ignoredPods.length > 0 && (
-                    <span className={`py-0.5 px-2 rounded text-xs font-medium ${isDark ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700'}`}>
-                      {ignoredPods.length}
-                    </span>
-                  )}
+                  <Server className="w-4 h-4" />
+                  <span>Live Pods</span>
                 </button>
               </div>
 
@@ -963,47 +1065,18 @@ const Dashboard = () => {
                       </p>
                     </div>
                   ) : (
-                    <PodTable pods={filteredPods} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} isDark={isDark} aiEnabled={aiEnabled} viewMode="active" canWrite={canWrite} />
+                    <PodTable pods={filteredPods} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} isDark={isDark} aiEnabled={aiEnabled} canWrite={canWrite} />
                   )}
                 </>
               )}
 
-              {/* History sub-tab */}
-              {podSubTab === 'history' && (
-                <>
-                  {filteredHistory.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Clock className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-                      <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                        No Resolved Pods
-                      </h3>
-                      <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                        Resolved pod failures will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <PodTable pods={filteredHistory} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} onDeleteRecord={handleDeletePodRecord} isDark={isDark} aiEnabled={aiEnabled} viewMode="history" canWrite={canWrite} />
-                  )}
-                </>
-              )}
-
-              {/* Ignored sub-tab */}
-              {podSubTab === 'ignored' && (
-                <>
-                  {filteredIgnored.length === 0 ? (
-                    <div className="text-center py-12">
-                      <EyeOff className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-                      <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                        No Ignored Pods
-                      </h3>
-                      <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                        Ignored pod failures will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <PodTable pods={filteredIgnored} onSolutionUpdated={handleSolutionUpdated} onLogAwareSolutionUpdated={handleLogAwareSolutionUpdated} onStatusChange={handleStatusChange} onDeleteRecord={handleDeletePodRecord} isDark={isDark} aiEnabled={aiEnabled} viewMode="ignored" canWrite={canWrite} />
-                  )}
-                </>
+              {/* Live Pods sub-tab */}
+              {podSubTab === 'live' && (
+                <LivePodsTable
+                  isDark={isDark}
+                  userAllowedNamespaces={user?.effective_namespaces || null}
+                  isAdmin={isAdmin}
+                />
               )}
             </>
           )}
@@ -1016,7 +1089,7 @@ const Dashboard = () => {
                 <button
                   onClick={handleSecurityRescan}
                   disabled={rescanRequesting || securityScanUpdating}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-sm border transition-colors ${
                     rescanRequesting || securityScanUpdating
                       ? isDark ? 'border-gray-600 bg-gray-800 text-gray-500 cursor-not-allowed' : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
                       : isDark ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200' : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
@@ -1031,7 +1104,7 @@ const Dashboard = () => {
 
               {/* Security scan updating notification */}
               {securityScanUpdating && (
-                <div className={`mb-4 p-4 rounded-lg border flex items-center ${isDark ? 'bg-blue-900/30 border-blue-700 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                <div className={`mb-4 p-4 rounded-sm border flex items-center ${isDark ? 'bg-blue-900/30 border-blue-700 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
                   <RefreshCw className="w-5 h-5 mr-3 animate-spin" />
                   <div>
                     <p className="font-medium">Security scan is updating...</p>
@@ -1069,14 +1142,18 @@ const Dashboard = () => {
               isDark={isDark}
               canWrite={canWrite}
               wsEvent={adviceEvent}
+              userAllowedNamespaces={user?.effective_namespaces || null}
+              isAdmin={isAdmin}
             />
           )}
 
           {activeTab === 'admin' && userRole === 'admin' && (
-            <AdminPanel isDark={isDark} onConfigChange={handleConfigChange} />
+            <AdminPanel isDark={isDark} onConfigChange={handleConfigChange} auditEvent={auditEvent} />
           )}
 
         </div>
+        </>
+        )}
       </div>
     </div>
   );
